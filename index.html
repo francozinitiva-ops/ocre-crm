@@ -768,9 +768,23 @@ const EST_CLASS = {"Pendiente":"t-ocre","Confirmada":"t-sky","En viaje":"t-terra
 const tagEst = r => { const e = estadoVis(r); return `<span class="tag ${EST_CLASS[e]}">${e}</span>`; };
 const esActiva = r => ["Pendiente","Confirmada","En viaje"].includes(estadoVis(r));
 
+/* Devolución de una reserva cancelada: lo cobrado menos lo que se retiene (penalidades de prestadores + cargo de gestión).
+   Se resuelve como devolución de dinero (Pendiente → Hecha) o como crédito a favor del cliente (Pendiente → Usado). */
+const FORMAS_DEV = ["Devolución","Crédito a favor"];
+const devDe = r => r.estado==="Cancelada" ? r.devolucion : null;
+const devPendiente = r => { const d = devDe(r); return d && d.forma!=="Crédito a favor" && d.estado!=="Hecha" ? n0(d.monto) : 0; };
+const creditoVivo = r => { const d = devDe(r); return d && d.forma==="Crédito a favor" && d.estado!=="Usado" ? n0(d.monto) : 0; };
+
 function estadoPago(r){
   const t = totalVenta(r), c = cobrado(r);
-  if(r.estado==="Cancelada") return c>0 ? `<span class="tag t-wine">Cobrado ${money(c,r.moneda)}</span>` : "";
+  if(r.estado==="Cancelada"){
+    const d = r.devolucion;
+    if(!(c>0)) return "";
+    if(!d) return `<span class="tag t-wine">Cobrado ${money(c,r.moneda)} · falta definir devolución</span>`;
+    if(n0(d.monto)<=0.5) return `<span class="tag t-gray">Sin devolución</span>`;
+    if(d.forma==="Crédito a favor") return d.estado==="Usado" ? `<span class="tag t-gray">Crédito usado</span>` : `<span class="tag t-ocre">Crédito a favor ${money(d.monto,r.moneda)}</span>`;
+    return d.estado==="Hecha" ? `<span class="tag t-olive">Devuelto ${money(d.monto,r.moneda)}</span>` : `<span class="tag t-wine">A devolver ${money(d.monto,r.moneda)}</span>`;
+  }
   if(!t) return `<span class="tag t-gray">Sin importe</span>`;
   if(c<=0) return `<span class="tag t-gray">Sin cobros</span>`;
   if(c >= t - 0.5) return `<span class="tag t-olive">Pagada</span>`;
@@ -1047,16 +1061,21 @@ VIEWS.panel = function(){
   /* viajes ya realizados: lo que todavía les debés a operadores sigue siendo plata ajena que tenés */
   const realizadasConDeuda = vivas.filter(r=>realizada(r) && deudaProv(r)>0.5);
   const debeRealizadas = r => Math.min(Math.max(0, cobrado(r)-pagadoProv(r)), deudaProv(r));
-  const enPoder = subM(sumM(pendientes, monR, r=>cobrado(r)-pagadoProv(r)), Object.fromEntries(Object.entries(sumM(realizadasConDeuda, monR, debeRealizadas)).map(([k,v])=>[k,-v])));
+  let enPoder = subM(sumM(pendientes, monR, r=>cobrado(r)-pagadoProv(r)), Object.fromEntries(Object.entries(sumM(realizadasConDeuda, monR, debeRealizadas)).map(([k,v])=>[k,-v])));
   const conAdelanto = pendientes.filter(r=>pagadoProv(r)-cobrado(r) > 0.5);
   const adelantos = sumM(conAdelanto, monR, r=>pagadoProv(r)-cobrado(r));
   const egrMes = sumM(DB.egresos.filter(e=>enMes(e.fecha)), e=>e.moneda, e=>e.monto);
+  const paraDevolver = sumM(R, monR, r=>devPendiente(r)+creditoVivo(r));
+  enPoder = subM(enPoder, Object.fromEntries(Object.entries(paraDevolver).map(([k,v])=>[k,-v])));
   /* de la plata de clientes que tenés, cuánto es para operadores y cuánto es margen anticipado */
   const paraOps = sumM(pendientes.concat(realizadasConDeuda), monR, r=>Math.min(Math.max(0, cobrado(r)-pagadoProv(r)), deudaProv(r)));
   const margenAnt = sumM(pendientes, monR, r=>Math.max(0, cobrado(r)-pagadoProv(r)-deudaProv(r)));
   const monPago = p => (byId(DB.reservas, p.reservaId)||{}).moneda || "ARS";
   const pagadoMes = sumM(DB.pagosProv.filter(p=>enMes(p.fecha)), monPago, p=>p.monto);
-  const flujoMes = subM(subM(cobradoMes, pagadoMes), egrMes);
+  /* devoluciones de reservas canceladas: lo pendiente (y los créditos vigentes) es plata de clientes; lo devuelto en el mes es salida de caja */
+  const devolPend = sumM(R, monR, devPendiente), creditos = sumM(R, monR, creditoVivo);
+  const devueltoMes = sumM(R.filter(r=>devDe(r) && devDe(r).estado==="Hecha" && devDe(r).forma!=="Crédito a favor" && enMes(r.devolucion.fechaDev)), monR, r=>r.devolucion.monto);
+  const flujoMes = subM(subM(subM(cobradoMes, pagadoMes), egrMes), devueltoMes);
   const anio = panelMes.slice(0,4);
   const egrAnio = sumM(DB.egresos.filter(e=>(e.fecha||"").slice(0,4)===anio && mesDe(e.fecha)<=panelMes), e=>e.moneda, e=>e.monto);
   const resAnio = subM(ganRealAnio, egrAnio);
@@ -1111,8 +1130,11 @@ VIEWS.panel = function(){
       <div class="q">Cómo estás parado ahora. No depende del mes elegido.</div>
       ${fila("Te deben los clientes", fmtM(porCobrar), {cls:posM(porCobrar)?"alert":"", ayuda:"Saldos de reservas que todavía no te pagaron."})}
       ${fila("Les debés a operadores", fmtM(porPagar), {ayuda:"Costos de servicios que todavía no pagaste."})}
+      ${posM(devolPend) ? fila("Devoluciones pendientes a clientes", fmtM(devolPend), {cls:"alert", go:"go('reservas','Cancelada')", ayuda:"Reservas canceladas con plata para devolver."}) : ""}
+      ${posM(creditos) ? fila("Créditos a favor de clientes", fmtM(creditos), {go:"go('reservas','Cancelada')", ayuda:"Plata de cancelaciones que el cliente usa en un próximo viaje."}) : ""}
       ${fila("Plata de clientes que tenés", fmtM(enPoder), {cls:"big sep", ayuda:"Lo cobrado de viajes que no terminaron (menos lo ya pagado), más lo que todavía debés de viajes terminados. Todavía no es tuya."})}
       ${fila("Para pagar a operadores", fmtM(paraOps), {cls:"sub", op:"–"})}
+      ${posM(paraDevolver) ? fila("Para devolver a clientes <span class='tiny'>(cancelaciones)</span>", fmtM(paraDevolver), {cls:"sub", op:"–"}) : ""}
       ${fila("Tu margen anticipado <span class='tiny'>(es tuyo cuando se haga el viaje)</span>", fmtM(margenAnt), {cls:"sub", op:"–"})}
       ${conAdelanto.length ? fila(`Adelantaste a operadores <span class='tiny'>(${conAdelanto.map(r=>`<a style="cursor:pointer" onclick="event.stopPropagation();go('reserva','${r.id}')">${r.id}</a>`).join(", ")})</span>`, neg(adelantos), {cls:"sub alert", op:"–"}) : ""}
       ${urg ? `<div class="pc-alert" onclick="go('avisos')">⚠ <span><b>${urg}</b> ${urg===1?"vencimiento atrasado o de hoy":"vencimientos atrasados o de hoy"}</span></div>` : ""}
@@ -1127,6 +1149,7 @@ VIEWS.panel = function(){
       ${fila("Cobraste a clientes", pos(cobradoMes), {cls:"sep", go:"go('cobros')"})}
       ${fila("Pagaste a operadores", neg(pagadoMes))}
       ${fila("Gastos de la agencia", neg(egrMes), {go:"go('egresos')"})}
+      ${posM(devueltoMes) ? fila("Devolviste a clientes", neg(devueltoMes), {go:"go('reservas','Cancelada')"}) : ""}
       ${fila("Quedó en caja", res(flujoMes), {cls:"tot big", ayuda:"Entró menos salió. Incluye plata de clientes: no es ganancia."})}
     </section>
 
@@ -1784,7 +1807,7 @@ VIEWS.reserva = function(){
     ${r.estado==="Pendiente"?`<button class="btn ghost sm" onclick="cambiarEstado('${r.id}','Confirmada')">Marcar confirmada</button>`:""}
     ${r.estado!=="Cancelada"?`<button class="btn ghost sm" style="color:var(--wine)" onclick="cancelarReserva('${r.id}')">Cancelar reserva</button>`:`<button class="btn ghost sm" onclick="cambiarEstado('${r.id}','Pendiente')">Reactivar</button>`}
   </div>
-  ${r.estado==="Cancelada"?`<div class="box" style="border-color:var(--wineS);background:#F3E6DF;margin-bottom:16px">Cancelada el ${fdate(r.fechaCancel)}${r.motivoCancel?": "+esc(r.motivoCancel):""}.${cob>0?` Tiene ${money(cob,r.moneda)} cobrados: resolvé devolución o crédito y dejalo anotado.`:""}</div>`:""}
+  ${r.estado==="Cancelada"?devBoxHTML(r):""}
   <div class="ed"><div>
     <div class="box"><h2>Viaje</h2><dl class="kv">
       <dt>Titular</dt><dd><a style="cursor:pointer" onclick="verCliente('${c.id}')">${esc(nom(c))}</a>${c.telefono?` · ${esc(c.telefono)}`:""} ${wa?`<a class="small" href="https://wa.me/${wa}" target="_blank" rel="noopener">WhatsApp</a>`:""}</dd>
@@ -1830,15 +1853,153 @@ VIEWS.reserva = function(){
       :`<div class="muted small">Todavía no hay cobros. Cada cobro genera su recibo numerado.</div>`}</div>
   </aside></div>`;
 };
-function cambiarEstado(id, e){ const r = byId(DB.reservas,id); r.estado = e; if(e!=="Cancelada"){ delete r.fechaCancel; delete r.motivoCancel; } save(); render(); toast(`Reserva ${e.toLowerCase()}.`); }
-function cancelarReserva(id){
+function cambiarEstado(id, e){
   const r = byId(DB.reservas,id);
+  if(e!=="Cancelada" && r.devolucion){
+    if(["Hecha","Usado"].includes(r.devolucion.estado)) return toast(r.devolucion.estado==="Hecha" ? "Ya registraste la devolución al cliente: no se puede reactivar. Cargá una reserva nueva." : "El crédito a favor ya se usó: no se puede reactivar. Cargá una reserva nueva.");
+    if(!confirm("Al reactivar se borra la devolución definida para esta reserva. ¿Seguir?")) return;
+    delete r.devolucion;
+  }
+  r.estado = e; if(e!=="Cancelada"){ delete r.fechaCancel; delete r.motivoCancel; } save(); render(); toast(`Reserva ${e.toLowerCase()}.`);
+}
+
+/* ── Cancelación con devolución ── */
+let dv = null;
+function dvInit(r){
+  const d = r.devolucion || {};
+  dv = {resId:r.id, penalidad:d.penalidad??"", gestion:d.gestion??"", monto:d.monto ?? Math.round(cobrado(r)*100)/100,
+    forma:d.forma||FORMAS_DEV[0], nota:d.nota||"", _manual:d.monto!=null && Math.abs(n0(d.monto) - Math.max(0, cobrado(r)-n0(d.penalidad)-n0(d.gestion)))>0.5};
+}
+function dvForm(r){
+  const cob = cobrado(r), pp = pagadoProv(r), g10 = Math.round(totalVenta(r)*0.10*100)/100;
+  return `<div class="box" style="padding:10px 14px;background:var(--bg);margin:0 0 12px"><div class="row small"><span>Cobrado al cliente <b>${money(cob,r.moneda)}</b></span>
+      ${pp>0.5?`<span class="muted">·</span><span>Ya pagaste a proveedores ${money(pp,r.moneda)}: averiguá cuánto te devuelven.</span>`:""}</div></div>
+    <div class="grid g2">
+      <label class="f"><span>Penalidades de prestadores (${r.moneda})</span><input id="dvPen" type="number" step="any" min="0" value="${dv.penalidad}" oninput="dv.penalidad=this.value;dvCalc()">
+        <span class="hint">Lo que los proveedores retienen o cobran por la cancelación.</span></label>
+      <label class="f"><span>Cargo de gestión (${r.moneda})</span><input id="dvGes" type="number" step="any" min="0" value="${dv.gestion}" oninput="dv.gestion=this.value;dvCalc()">
+        <span class="hint">${g10>0?`<a style="cursor:pointer" onclick="dv.gestion=${g10};$('dvGes').value=${g10};dvCalc()">Usar 10% del total (${money(g10,r.moneda)})</a>`:"Según la política de cancelación."}</span></label>
+      <label class="f req"><span>Monto a devolver (${r.moneda})</span><input id="dvMonto" type="number" step="any" min="0" value="${dv.monto}" oninput="dv.monto=this.value;dv._manual=1">
+        <div class="hint">Se calcula solo: cobrado − penalidades − cargo. Si acordaste otro importe, corregilo acá. <a style="cursor:pointer" onclick="dv._manual=0;dvCalc()">Recalcular</a></div></label>
+      <label class="f"><span>Cómo se resuelve</span><select onchange="dv.forma=this.value">${opts(FORMAS_DEV, dv.forma)}</select>
+        <span class="hint">Crédito a favor: la plata queda para un próximo viaje del cliente.</span></label>
+      <label class="f spanall"><span>Nota</span><input value="${esc(dv.nota)}" placeholder="Ej.: el hotel retiene la primera noche" oninput="dv.nota=this.value"></label>
+    </div>`;
+}
+function dvCalc(){
+  if(dv._manual) return;
+  const r = byId(DB.reservas, dv.resId);
+  dv.monto = Math.round(Math.max(0, cobrado(r) - n0(dv.penalidad) - n0(dv.gestion))*100)/100;
+  const el = $("dvMonto"); if(el) el.value = dv.monto;
+}
+/* Valida el formulario y devuelve el objeto a guardar (o null si falta algo). */
+function dvLeer(r){
+  const monto = n0(dv.monto), cob = cobrado(r);
+  if(dv.monto==="" || monto<0) return toast("Cargá el monto a devolver (puede ser 0)."), null;
+  if(monto > cob+0.5 && !confirm(`El monto a devolver (${money(monto,r.moneda)}) supera lo cobrado (${money(cob,r.moneda)}). ¿Guardarlo igual?`)) return null;
+  const prev = r.devolucion || {};
+  return {monto, penalidad:n0(dv.penalidad), gestion:n0(dv.gestion), forma:dv.forma, nota:dv.nota.trim(),
+    estado: prev.forma===dv.forma && prev.estado ? prev.estado : "Pendiente", fechaDef: prev.fechaDef || today()};
+}
+function cancelarReserva(id){
+  const r = byId(DB.reservas,id), cob = cobrado(r);
+  if(cob>0) dvInit(r);
   openModal(`<div class="modal-h"><h2>Cancelar ${r.id}</h2><button class="x" onclick="closeModal()">×</button></div>
     <div class="modal-b"><label class="f"><span>Motivo</span><input id="motCan" placeholder="Ej.: el cliente no pudo viajar por trabajo"></label>
-    ${cobrado(r)>0?`<div class="hint" style="margin-top:8px;color:var(--wine)">Tiene ${money(cobrado(r),r.moneda)} cobrados. La cancelación no los devuelve: revisá penalidades del proveedor antes de definir la devolución.</div>`:""}</div>
-    <div class="modal-f"><button class="btn sec" onclick="closeModal()">Volver</button><button class="btn danger" onclick="confirmarCancel('${id}')">Cancelar reserva</button></div>`);
+    ${cob>0?`<h3 style="margin:20px 0 10px">Devolución al cliente</h3>${dvForm(r)}
+      <div class="hint" style="margin-top:8px">Si todavía no sabés las penalidades, dejalo como está: lo podés corregir después desde la reserva.</div>`:""}</div>
+    <div class="modal-f"><button class="btn sec" onclick="closeModal()">Volver</button><button class="btn danger" onclick="confirmarCancel('${id}')">Cancelar reserva</button></div>`, cob>0?"wide":undefined);
 }
-function confirmarCancel(id){ const r = byId(DB.reservas,id); r.estado="Cancelada"; r.fechaCancel=today(); r.motivoCancel=$("motCan").value.trim(); save(); closeModal(); render(); toast("Reserva cancelada."); }
+function confirmarCancel(id){
+  const r = byId(DB.reservas,id);
+  let d = null;
+  if(cobrado(r)>0){ d = dvLeer(r); if(!d) return; }
+  r.estado="Cancelada"; r.fechaCancel=today(); r.motivoCancel=$("motCan").value.trim();
+  if(d) r.devolucion = d; else delete r.devolucion;
+  dv = null; save(); closeModal(); render(); toast("Reserva cancelada.");
+}
+function formDevolucion(id){
+  const r = byId(DB.reservas,id); dvInit(r);
+  openModal(`<div class="modal-h"><h2>Devolución de ${r.id}</h2><button class="x" onclick="closeModal()">×</button></div>
+    <div class="modal-b">${dvForm(r)}</div>
+    <div class="modal-f"><button class="btn sec" onclick="closeModal()">Cancelar</button><button class="btn" onclick="guardarDevolucion('${id}')">Guardar</button></div>`, "wide");
+}
+function guardarDevolucion(id){
+  const r = byId(DB.reservas,id), d = dvLeer(r); if(!d) return;
+  r.devolucion = Object.assign(r.devolucion||{}, d); dv = null; save(); closeModal(); render(); toast("Devolución guardada.");
+}
+function formDevHecha(id){
+  const r = byId(DB.reservas,id), d = r.devolucion;
+  openModal(`<div class="modal-h"><h2>Registrar devolución</h2><button class="x" onclick="closeModal()">×</button></div>
+    <div class="modal-b"><p class="small" style="margin-top:0">${r.id} · ${esc(nombreCliente(r.clienteId))} · se devuelven <b>${money(d.monto,r.moneda)}</b></p>
+    <div class="grid g2">
+      <label class="f"><span>Fecha</span><input id="dhFecha" type="date" value="${today()}"></label>
+      <label class="f"><span>Medio</span><select id="dhMedio">${opts(DB.cfg.medios, "Transferencia")}</select></label>
+      <label class="f spanall"><span>Comprobante o nota</span><input id="dhNota" placeholder="N.º de transferencia, CBU de destino…"></label>
+    </div></div>
+    <div class="modal-f"><button class="btn sec" onclick="closeModal()">Cancelar</button><button class="btn" onclick="guardarDevHecha('${id}')">Registrar devolución</button></div>`);
+}
+function guardarDevHecha(id){
+  const d = byId(DB.reservas,id).devolucion;
+  Object.assign(d, {estado:"Hecha", fechaDev:$("dhFecha").value||today(), medioDev:$("dhMedio").value, notaDev:$("dhNota").value.trim()});
+  save(); closeModal(); render(); toast("Devolución registrada.");
+}
+function formCreditoUsado(id){
+  const r = byId(DB.reservas,id);
+  openModal(`<div class="modal-h"><h2>Usar crédito a favor</h2><button class="x" onclick="closeModal()">×</button></div>
+    <div class="modal-b"><p class="small" style="margin-top:0">${r.id} · ${esc(nombreCliente(r.clienteId))} · crédito de <b>${money(r.devolucion.monto,r.moneda)}</b></p>
+    <div class="hint" style="margin-bottom:10px">Para que descuente del saldo del viaje nuevo, registralo también como cobro en esa reserva (medio «Otro», nota «crédito de ${r.id}»).</div>
+    <label class="f"><span>En qué se usó</span><input id="cuNota" placeholder="Ej.: aplicado a RES-0012"></label></div>
+    <div class="modal-f"><button class="btn sec" onclick="closeModal()">Cancelar</button><button class="btn" onclick="guardarCreditoUsado('${id}')">Marcar como usado</button></div>`);
+}
+function guardarCreditoUsado(id){
+  const d = byId(DB.reservas,id).devolucion;
+  Object.assign(d, {estado:"Usado", fechaDev:today(), notaDev:$("cuNota").value.trim()});
+  save(); closeModal(); render(); toast("Crédito marcado como usado.");
+}
+function deshacerDev(id){
+  const d = byId(DB.reservas,id).devolucion;
+  if(!confirm(d.estado==="Hecha" ? "¿Deshacer la devolución registrada? Vuelve a quedar pendiente." : "¿Deshacer el uso del crédito? Vuelve a quedar vigente.")) return;
+  d.estado = "Pendiente"; delete d.fechaDev; delete d.medioDev; delete d.notaDev; save(); render();
+}
+function copiarDevolucion(id){
+  const r = byId(DB.reservas,id), d = r.devolucion, c = byId(DB.clientes,r.clienteId)||{};
+  const L = [`*Cancelación de la reserva ${r.id}* · ${DB.cfg.agencia}`, `${tituloRes(r)}${r.salida?" · salida "+fdate(r.salida):""}`, "",
+    `Abonado: ${money(cobrado(r),r.moneda,true)}`];
+  if(d.penalidad) L.push(`Penalidades de prestadores: − ${money(d.penalidad,r.moneda,true)}`);
+  if(d.gestion) L.push(`Cargo de gestión: − ${money(d.gestion,r.moneda,true)}`);
+  L.push(d.forma==="Crédito a favor" ? `*Crédito a favor: ${money(d.monto,r.moneda,true)}* (para tu próximo viaje)` : `*A devolver: ${money(d.monto,r.moneda,true)}*`);
+  if(d.estado==="Hecha") L.push(`Devuelto el ${fdate(d.fechaDev)}${d.medioDev?" por "+d.medioDev.toLowerCase():""}.`);
+  copiar(L.join("\n"), "Detalle copiado. Pegalo en WhatsApp.");
+}
+function devBoxHTML(r){
+  const cob = cobrado(r), d = r.devolucion, m = v => money(v,r.moneda);
+  const enc = `Cancelada el ${fdate(r.fechaCancel)}${r.motivoCancel?": "+esc(r.motivoCancel):""}.`;
+  let cuerpo = "";
+  if(cob>0 && !d) cuerpo = `<div style="margin-top:8px">Tiene ${m(cob)} cobrados y todavía no definiste cuánto se devuelve.</div>
+    <div class="row" style="margin-top:10px"><button class="btn sm" onclick="formDevolucion('${r.id}')">Definir devolución</button></div>`;
+  else if(d){
+    const cred = d.forma==="Crédito a favor", cerrada = ["Hecha","Usado"].includes(d.estado), cero = n0(d.monto)<=0.5;
+    const est = cero ? `<span class="tag t-gray">Sin devolución</span>`
+      : cred ? (d.estado==="Usado" ? `<span class="tag t-gray">Crédito usado el ${fdate(d.fechaDev)}</span>` : `<span class="tag t-ocre">Crédito vigente</span>`)
+      : (d.estado==="Hecha" ? `<span class="tag t-olive">Devuelto el ${fdate(d.fechaDev)}${d.medioDev?" · "+esc(d.medioDev):""}</span>` : `<span class="tag t-wine">Pendiente de devolver</span>`);
+    cuerpo = `<dl class="kv" style="margin-top:10px">
+        <dt>Cobrado</dt><dd>${m(cob)}</dd>
+        ${d.penalidad?`<dt>Penalidades</dt><dd>− ${m(d.penalidad)}</dd>`:""}
+        ${d.gestion?`<dt>Cargo de gestión</dt><dd>− ${m(d.gestion)}</dd>`:""}
+        <dt><b>${cred?"Crédito a favor":"A devolver"}</b></dt><dd><b>${m(d.monto)}</b> ${est}</dd>
+        ${cob-n0(d.monto)>0.5?`<dt>Queda en la agencia</dt><dd>${m(cob-n0(d.monto))}</dd>`:""}
+        ${d.nota?`<dt>Nota</dt><dd>${esc(d.nota)}</dd>`:""}
+        ${d.notaDev?`<dt>${cred?"Uso":"Comprobante"}</dt><dd>${esc(d.notaDev)}</dd>`:""}
+      </dl>
+      <div class="row" style="margin-top:10px">
+        ${!cero && !cerrada ? (cred ? `<button class="btn sm" onclick="formCreditoUsado('${r.id}')">Marcar crédito usado</button>` : `<button class="btn sm" onclick="formDevHecha('${r.id}')">Registrar devolución</button>`) : ""}
+        ${!cerrada ? `<button class="btn sec sm" onclick="formDevolucion('${r.id}')">Editar montos</button>` : `<button class="btn ghost sm" onclick="deshacerDev('${r.id}')">Deshacer</button>`}
+        ${!cero ? `<button class="btn ghost sm" onclick="copiarDevolucion('${r.id}')">Copiar para WhatsApp</button>` : ""}
+      </div>`;
+  }
+  return `<div class="box" style="border-color:var(--wineS);background:#F3E6DF;margin-bottom:16px">${enc}${cuerpo}</div>`;
+}
 
 function copiarResumen(id){
   const r = byId(DB.reservas,id), c = byId(DB.clientes,r.clienteId)||{};
