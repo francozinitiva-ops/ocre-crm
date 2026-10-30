@@ -1672,7 +1672,6 @@ function barraHTML(r){
 VIEWS.resEdit = function(){
   if(!ed) return VIEWS.reservas();
   const r = ed;
-  const clis = sortBy(DB.clientes,nom).map(c=>({v:c.id,t:nom(c)+(c.doc?" · "+c.doc:"")}));
   const titular = byId(DB.clientes, r.clienteId);
   const leads = sortBy(DB.leads.filter(l=>l.id===r.leadId || (leadAbierto(l) || (l.etapa==="Reservado" && !l.reservaId))), l=>l.nombre).map(l=>({v:l.id,t:`${l.nombre} · ${l.etapa} · ${l.id}`}));
   return head(r.id ? "Editar reserva "+r.id : "Nueva reserva", "Solo cliente y destino son obligatorios. El resto se completa cuando lo tengas.",
@@ -1680,8 +1679,8 @@ VIEWS.resEdit = function(){
   `<div class="re">
     <div class="box"><h2>Datos de la reserva</h2>
       <div class="grp"><div class="gl">Cliente</div><div class="grid g3">
-        <label class="f req span2"><span>Cliente titular</span><div class="withadd"><select onchange="cambiarCliente(this.value)">${opts(clis, r.clienteId, "Elegí un cliente")}</select>
-          <button class="btn sec sm" onclick="editar('clientes',null,id=>cambiarCliente(id))">Nuevo</button></div></label>
+        <div class="f req span2"><span>Cliente titular</span><div class="withadd">${combo("cli", cliItems(), r.clienteId, "Buscá por nombre, DNI o teléfono…", v=>cambiarCliente(v))}
+          <button class="btn sec sm" onclick="editar('clientes',null,id=>cambiarCliente(id))">Nuevo</button></div></div>
         <label class="f"><span>Lead de origen</span><select onchange="ev('leadId',this.value)" title="Al guardar, el lead pasa a Reservado.">${opts(leads, r.leadId, "Ninguno")}</select></label>
       </div></div>
 
@@ -1764,6 +1763,10 @@ function cambiarCliente(id){
 /* ── buscador desplegable genérico ── */
 const COMBOS = {};
 const normTxt = s => String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
+function cliItems(){
+  return sortBy(DB.clientes, nom).map(c=>({v:c.id, t:nom(c), s:c.doc||"",
+    q:normTxt([nom(c), c.doc, c.telefono, c.email, c.id].join(" "))}));
+}
 function destItems(){
   return sortBy(DB.destinos,d=>d.nombre).map(d=>({v:d.id, t:d.nombre, s:d.provincia||"",
     tag:d.tipo==="receptivo"?`<span class="tag t-terra">Receptivo</span>`:`<span class="tag t-sky">Emisivo</span>`,
@@ -1804,7 +1807,7 @@ function cbKey(e, key){
 function cbBlur(key){
   setTimeout(()=>{ const box = $("cb_"+key); if(!box || box.contains(document.activeElement)) return;
     box.querySelector(".combo-list").hidden = true;
-    const C = COMBOS[key], v = key==="dest" ? ed?.destinoId : null, cur = C && C.items.find(i=>i.v===v);
+    const C = COMBOS[key], v = key==="dest" ? ed?.destinoId : key==="cli" ? ed?.clienteId : null, cur = C && C.items.find(i=>i.v===v);
     box.querySelector("input").value = cur ? cur.t+(cur.s?" ("+cur.s+")":"") : ""; }, 120);
 }
 function cbPick(key, k){
