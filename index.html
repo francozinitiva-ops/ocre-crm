@@ -477,6 +477,12 @@ const CFG_DEF = {
   temporadas:["Verano","Vacaciones de invierno","Fines de semana largos","Otoño / primavera","Todo el año"],
   msgCumple:"¡Feliz cumpleaños, {nombre}! 🎉 Desde {agencia} te deseamos un gran año, ojalá lleno de viajes. ¡Un abrazo!",
   avisoDias:7,
+  diasPagoProv:3, diasCliente:2,
+  feriados:["2026-11-06 Día del Bancario (bancos cerrados)","2026-11-09 Feriado por la visita del Papa León XIV","2026-11-23 Día de la Soberanía Nacional (trasladado)",
+    "2026-12-07 Día no laborable con fines turísticos","2026-12-08 Inmaculada Concepción","2026-12-25 Navidad","2027-01-01 Año Nuevo","2027-02-08 Carnaval",
+    "2027-02-09 Carnaval","2027-03-24 Día de la Memoria","2027-03-25 Jueves Santo (no laborable)","2027-03-26 Viernes Santo","2027-04-02 Malvinas",
+    "2027-05-25 Revolución de Mayo","2027-06-21 Güemes (trasladado)","2027-07-09 Día de la Independencia","2027-08-16 San Martín (trasladado)",
+    "2027-10-11 Diversidad Cultural (trasladado)","2027-12-08 Inmaculada Concepción"],
   msgRecordatorio:"¡Hola {nombre}! ¿Cómo estás? Te escribo de {agencia} para recordarte que el saldo de tu viaje {viaje} es de {saldo} y {vencimiento}. Cuando lo abones, avisame y te mando el recibo. ¡Gracias!",
   noIncluye:"Comidas y bebidas no mencionadas, propinas, gastos personales, entradas no detalladas y todo servicio que no figure como incluido.",
   politicas:`## Reserva y pago
@@ -548,6 +554,16 @@ const pad = n => String(n).padStart(2,"0");
 const isoD = d => d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
 const today = () => isoD(new Date());
 const addDays = (iso,n) => { const d = new Date(iso+"T12:00:00"); d.setDate(d.getDate()+n); return isoD(d); };
+/* Días hábiles: lunes a viernes, sin los feriados de Configuración ("AAAA-MM-DD Nombre"). */
+const esHabil = iso => { const w = new Date(iso+"T12:00:00").getDay(); return w>0 && w<6 && !(DB.cfg.feriados||[]).some(f=>f.slice(0,10)===iso); };
+function habilesAntes(iso, n){ let d = iso, k = 0; for(let i=0; i<90 && k<n; i++){ d = addDays(d,-1); if(esHabil(d)) k++; } return d; }
+const pagarAntes = s => s.vtoPago ? habilesAntes(s.vtoPago, n0(DB.cfg.diasPagoProv)||3) : "";
+/* Vencimiento sugerido del cliente: N días hábiles antes del primer pago a proveedor que quede pendiente. */
+function vtoSugerido(r){
+  const f = svcActivos(r).filter(s=>s.vtoPago && (!s.id || pagadoSvc(s) < svcC(s,r)-0.5)).map(pagarAntes).sort()[0];
+  return f ? habilesAntes(f, n0(DB.cfg.diasCliente)||2) : "";
+}
+const fdia = iso => iso ? DIAS[new Date(iso+"T12:00:00").getDay()].slice(0,3)+" "+fdate(iso).slice(0,5) : "";
 const diffDays = (a,b) => Math.round((new Date(b+"T12:00:00") - new Date(a+"T12:00:00"))/864e5);
 const mesDe = iso => (iso||"").slice(0,7);
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
@@ -1632,12 +1648,24 @@ function svcBloque(s, i){
         ${inp(p+"localizador", s.localizador, s.tipo==="aereo"?"PNR / código":"N.º de confirmación")}
         <div>${inp(p+"costo", s.costo, "Costo por persona ("+ed.moneda+")", "number", 'step="any" min="0" placeholder="Por pasajero"')}
           <div class="tiny" id="calc_${i}" style="margin-top:3px">${txtSvc(s,ed)}</div></div>
-        ${inp(p+"vtoPago", s.vtoPago, "Vence pago a proveedor", "date")}
+        <div>${inp(p+"vtoPago", s.vtoPago, "Vence pago a proveedor", "date")}
+          <div class="tiny" id="pa_${i}" style="margin-top:3px">${txtPagar(s)}</div></div>
         <div class="span2">${inp(p+"notas", s.notas, "Notas del servicio")}</div>
       </div>
       ${pagado?`<div class="tiny" style="margin-top:6px">Pagado al proveedor: ${money(pagado,ed.moneda)}</div>`:""}</div>
     </div></div>`;
 }
+function txtPagar(s){
+  return s.vtoPago ? `Pagale a más tardar el <b>${fdia(pagarAntes(s))}</b>` : "";
+}
+function txtVtoSug(r){
+  const v = vtoSugerido(r); if(!v) return "";
+  const usar = `<a style="cursor:pointer" onclick="usarVtoSug()">Usar</a>`;
+  if(!r.vtoSaldo) return `Sugerido: <b>${fdia(v)}</b> · ${usar}`;
+  if(r.vtoSaldo > v) return `<span style="color:var(--wine)">Tarde: tendría que vencer a más tardar el ${fdia(v)}</span> · ${usar}`;
+  return `Con margen (límite ${fdia(v)})`;
+}
+function usarVtoSug(){ const v = vtoSugerido(ed); if(v){ ed.vtoSaldo = v; render(); } }
 function txtSvc(s, r){
   const n = paxCount(r);
   return n ? `× ${n} ${n===1?"pasajero":"pasajeros"} = <b>${money(svcC(s,r),r.moneda)}</b>` : `<span style="color:var(--wine)">Cargá los pasajeros para ver el total</span>`;
@@ -1657,7 +1685,8 @@ function resumenHTML(r){
 function updSum(){
   if(ed && ed._paq){ const k = $("pkSum"); if(k) k.innerHTML = resumenPaq(ed); return; }
   const el = $("edSum"); if(el) el.innerHTML = barraHTML(ed);
-  ed.servicios.forEach((s,i)=>{ const c = $("calc_"+i); if(c) c.innerHTML = txtSvc(s,ed); });
+  ed.servicios.forEach((s,i)=>{ const c = $("calc_"+i); if(c) c.innerHTML = txtSvc(s,ed); const a = $("pa_"+i); if(a) a.innerHTML = txtPagar(s); });
+  const vs = $("vtoSug"); if(vs) vs.innerHTML = txtVtoSug(ed);
 }
 
 /* Totales del editor: barra fija abajo, siempre a la vista. */
@@ -1699,7 +1728,8 @@ VIEWS.resEdit = function(){
         ${sel("estado", r.estado, "Estado", ESTADOS_RES)}
         <label class="f"><span>Moneda</span><select ${bindR("moneda")}>${opts(MONEDAS, r.moneda)}</select></label>
         ${inp("tarifaPax", r.tarifaPax, "Tarifa de venta por persona ("+r.moneda+")", "number", 'step="any" min="0" placeholder="Lo que cobrás por pasajero" style="font-weight:650;border-color:var(--terra);background:var(--paper2)"')}
-        ${inp("vtoSaldo", r.vtoSaldo, "Vence el saldo (cliente)", "date")}
+        <div>${inp("vtoSaldo", r.vtoSaldo, "Vence el saldo (cliente)", "date")}
+          <div class="tiny" id="vtoSug" style="margin-top:3px">${txtVtoSug(r)}</div></div>
       </div></div>
 
       <div class="grp"><div class="gl">Notas</div><div>
@@ -3059,9 +3089,12 @@ VIEWS.config = function(){
   <div class="box"><h2>Tipos de cambio</h2><p class="small muted" style="margin-top:-6px">Se usan solo para convertir un cobro cuando el cliente paga en una moneda distinta a la de la reserva. El panel muestra cada moneda por separado.</p><div class="grid g4">
     <label class="f"><span>1 US$ en pesos</span><input type="number" value="${g.tc.USD}" oninput="DB.cfg.tc.USD=Number(this.value)||0;save()"></label>
     <label class="f"><span>1 R$ en pesos</span><input type="number" value="${g.tc.BRL}" oninput="DB.cfg.tc.BRL=Number(this.value)||0;save()"></label></div></div>
-  <div class="dgrid" style="margin-top:16px">${lista("medios","Medios de pago")}${lista("canales","Canales de ingreso")}${lista("localidades","Localidades")}${lista("tiposProv","Tipos de proveedor")}${lista("catEgresos","Categorías de egresos")}${lista("segmentos","Perfiles de cliente")}${lista("intereses","Intereses")}${lista("viajaCon","Con quién viaja")}${lista("temporadas","Cuándo prefiere viajar")}${lista("presupuestos","Presupuestos")}</div>
+  <div class="dgrid" style="margin-top:16px">${lista("medios","Medios de pago")}${lista("canales","Canales de ingreso")}${lista("localidades","Localidades")}${lista("tiposProv","Tipos de proveedor")}${lista("catEgresos","Categorías de egresos")}${lista("segmentos","Perfiles de cliente")}${lista("intereses","Intereses")}${lista("viajaCon","Con quién viaja")}${lista("temporadas","Cuándo prefiere viajar")}${lista("presupuestos","Presupuestos")}${lista("feriados","Feriados y días no laborables (AAAA-MM-DD Nombre)")}</div>
   <div class="box" style="margin-top:16px"><h2>Avisos de vencimientos</h2>
-    <div class="grid g4"><label class="f"><span>Avisar con anticipación (días)</span><input type="number" min="1" max="60" value="${g.avisoDias}" oninput="DB.cfg.avisoDias=Math.max(1,Number(this.value)||7);save()" onchange="renderSide()"></label></div>
+    <div class="grid g4"><label class="f"><span>Avisar con anticipación (días)</span><input type="number" min="1" max="60" value="${g.avisoDias}" oninput="DB.cfg.avisoDias=Math.max(1,Number(this.value)||7);save()" onchange="renderSide()"></label>
+      <label class="f"><span>Pagar al proveedor (hábiles antes)</span><input type="number" min="0" max="20" value="${g.diasPagoProv}" oninput="DB.cfg.diasPagoProv=Math.max(0,Number(this.value)||0);save()"></label>
+      <label class="f"><span>Cobrar al cliente (hábiles antes)</span><input type="number" min="0" max="20" value="${g.diasCliente}" oninput="DB.cfg.diasCliente=Math.max(0,Number(this.value)||0);save()"></label></div>
+    <p class="hint" style="margin:6px 0 0">Con estos márgenes, cada servicio muestra hasta cuándo pagarle al proveedor y la reserva sugiere el vencimiento del cliente. El cliente vence esos días hábiles antes de la fecha de pago al proveedor. Días hábiles: lunes a viernes, sin los feriados de la lista de arriba.</p>
     <label class="f" style="margin-top:12px"><span>Mensaje de recordatorio de pago (WhatsApp)</span><textarea rows="3" oninput="DB.cfg.msgRecordatorio=this.value;save()">${esc(g.msgRecordatorio)}</textarea>
       <span class="hint">Se reemplazan solos: {nombre} {agencia} {viaje} {reserva} {saldo} {vencimiento}.</span></label>
     <label class="f" style="margin-top:12px"><span>Saludo de cumpleaños (WhatsApp)</span><textarea rows="2" oninput="DB.cfg.msgCumple=this.value;save()">${esc(g.msgCumple)}</textarea>
@@ -3081,7 +3114,9 @@ VIEWS.config = function(){
       <button class="btn danger" onclick="borrarTodo()">Borrar todo</button></div>
     <div class="hint" style="margin-top:8px">“Importar del sistema anterior” toma el respaldo del CRM con cotizador y trae clientes, proveedores, destinos y egresos. Las reservas y cotizaciones viejas no se migran.</div></div>`;
 };
-function sumarLista(k){ const i = $("add_"+k), v = i.value.trim(); if(!v) return; if(DB.cfg[k].includes(v)) return toast("Ya está en la lista."); DB.cfg[k].push(v); save(); render(); }
+function sumarLista(k){ const i = $("add_"+k), v = i.value.trim(); if(!v) return; if(DB.cfg[k].includes(v)) return toast("Ya está en la lista.");
+  if(k==="feriados" && !/^\d{4}-\d{2}-\d{2}( |$)/.test(v)) return toast("Escribilo así: 2027-06-17 Güemes");
+  DB.cfg[k].push(v); if(k==="feriados") DB.cfg[k].sort(); save(); render(); }
 function quitarLista(k,i){ DB.cfg[k].splice(i,1); save(); render(); }
 /* Descargas: dentro del visor de Claude se usa la capacidad "downloads"
    (pide confirmación); fuera del visor, un enlace de descarga común. */
