@@ -276,6 +276,31 @@ tfoot td{font-weight:650;background:var(--paper2);border-bottom:0}
 .kv{display:grid;grid-template-columns:130px 1fr;gap:6px 12px;font-size:13.5px}
 .kv dt{color:var(--ink2)} .kv dd{margin:0}
 .svc-sum{display:grid;grid-template-columns:1fr auto;gap:2px 16px}
+/* editor de reserva: una columna, grupos con la misma grilla */
+.re{max-width:1000px}
+.re .box{padding:16px 18px}
+.re .box>h2,.re .box>.sect-h{margin-bottom:8px}
+.re label.f,.re div.f{gap:3px;font-size:12px}
+.re input,.re select{padding:6px 8px;font-size:13.5px}
+.re .grid{gap:10px 12px}
+.grp{display:grid;grid-template-columns:110px minmax(0,1fr);gap:0 16px;padding:12px 0;border-top:1px solid var(--line)}
+.grp:first-of-type{border-top:0;padding-top:4px}
+.grp>.gl{font-size:11px;font-weight:650;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);padding-top:21px}
+.ro{padding:6px 0;font-size:13.5px;color:var(--ink);min-height:31px;display:flex;align-items:center}
+.tbl-h,.tbl-r{display:grid;gap:8px;align-items:center}
+.tbl-h{font-size:12px;color:var(--ink2);padding-bottom:3px}
+.tbl-r{margin-bottom:6px}
+.cols-pax{grid-template-columns:2fr 1.2fr 1fr 1fr 28px}
+.cols-hab{grid-template-columns:64px 1fr 1.3fr 1.1fr 28px}
+.svc-h .sub{font-size:12.5px;color:var(--ink2);font-weight:400;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.svc-row{padding-top:10px;margin-top:10px;border-top:1px dashed var(--line)}
+.svc-sec{font-size:11px;font-weight:650;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin-bottom:6px}
+.re-bar{position:sticky;bottom:0;z-index:5;margin-top:16px;background:var(--paper);border:1px solid var(--line2);border-radius:7px;
+  padding:10px 16px;display:flex;align-items:center;gap:8px 24px;flex-wrap:wrap;box-shadow:0 -2px 12px rgba(40,30,15,.10)}
+.re-bar .m{display:flex;flex-direction:column;line-height:1.25}
+.re-bar .m span{font-size:11.5px;color:var(--ink3)}
+.re-bar .m b{font-size:15px;font-weight:650}
+.re-bar .acts{margin-left:auto;display:flex;gap:8px}
 .progress{height:8px;background:var(--paper2);border-radius:2px;overflow:hidden;margin:6px 0 4px}
 .progress i{display:block;height:100%;background:var(--olive)}
 
@@ -405,6 +430,14 @@ tfoot td{font-weight:650;background:var(--paper2);border-bottom:0}
   .kgroup>.kl{padding-bottom:8px}
   .k{border-left:0;padding:6px 0}
   .hab,.pax{grid-template-columns:1fr 1fr}
+  .grp{grid-template-columns:1fr}
+  .grp>.gl{padding:0 0 6px}
+  .tbl-h{display:none}
+  .cols-pax,.cols-hab{grid-template-columns:1fr 1fr;padding-bottom:8px;border-bottom:1px dashed var(--line)}
+  .svc-h .sub{display:none}
+  .re-bar{gap:6px 16px}
+  .re-bar .acts{width:100%}
+  .re-bar .acts .btn{flex:1}
   .today .h{font-size:24px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -1522,47 +1555,50 @@ function moverServicio(i, d){ const j = i+d; if(j<0||j>=ed.servicios.length) ret
 const inp = (path, v, l, type="text", extra="") => `<label class="f"><span>${l}</span><input type="${type}" value="${esc(v??"")}" ${bind(path)} ${extra}></label>`;
 const sel = (path, v, l, ops, rer) => `<label class="f"><span>${l}</span><select ${rer?bindR(path):`onchange="ev('${path}',this.value)"`}>${opts(ops, v)}</select></label>`;
 
+/* Celdas sin etiqueta para las filas tipo tabla (pasajeros, habitaciones). */
+const cin = (path, v, aria, type="text", extra="") => `<input type="${type}" value="${esc(v??"")}" aria-label="${aria}" ${bind(path)} ${extra}>`;
+const csel = (path, v, aria, ops) => `<select aria-label="${aria}" onchange="ev('${path}',this.value)">${opts(ops, v)}</select>`;
+/* Qué proveedor pide cada tipo de servicio: [tipo sugerido, etiqueta]. El aéreo va solo por operador. */
+const SVC_PROV = {alojamiento:["Alojamiento","Establecimiento"], traslado:["Transporte","Transportista"], excursion:["Excursiones","Prestador"],
+  asistencia:["Asistencia al viajero","Compañía"], paquete:["Operador / Mayorista","Operador / mayorista"], otro:["","Proveedor"]};
+
+/* Detalle propio de cada tipo de servicio (sin proveedor ni costos, que van en filas comunes). */
 function svcCampos(s, i){
   const p = `servicios.${i}.`;
   switch(s.tipo){
     case "alojamiento": {
       return `<div class="grid g4">
-        <div class="span2">${provSelect(p+"proveedorId", s.proveedorId, "Alojamiento", "Establecimiento")}</div>
         ${inp(p+"checkin", s.checkin, "Check-in", "date", `onchange="upNoches(${i})"`)}
         ${inp(p+"checkout", s.checkout, "Check-out", "date", `onchange="upNoches(${i})"`)}
+        <div class="f span2"><span>Noches</span><div class="ro" id="noches_${i}">${txtNoches(s)}</div></div>
       </div>
-      <div class="tiny" id="noches_${i}" style="margin:6px 0 12px">${txtNoches(s)}</div>
-      <div class="small muted" style="margin-bottom:6px">Habitaciones</div>
-      ${(s.habitaciones||[]).map((h,j)=>`<div class="hab">
-        ${inp(p+`habitaciones.${j}.cant`, h.cant, "Cant.", "number", 'min="1"')}
-        ${sel(p+`habitaciones.${j}.tipo`, h.tipo, "Tipo", HAB_TIPOS)}
-        ${sel(p+`habitaciones.${j}.camas`, h.camas, "Camas", HAB_CAMAS)}
-        ${sel(p+`habitaciones.${j}.regimen`, h.regimen, "Régimen", REGIMEN)}
+      <div class="svc-row"><div class="tbl-h cols-hab"><span>Cant.</span><span>Habitación</span><span>Camas</span><span>Régimen</span><span></span></div>
+      ${(s.habitaciones||[]).map((h,j)=>`<div class="tbl-r cols-hab">
+        ${cin(p+`habitaciones.${j}.cant`, h.cant, "Cantidad", "number", 'min="1"')}
+        ${csel(p+`habitaciones.${j}.tipo`, h.tipo, "Tipo de habitación", HAB_TIPOS)}
+        ${csel(p+`habitaciones.${j}.camas`, h.camas, "Camas", HAB_CAMAS)}
+        ${csel(p+`habitaciones.${j}.regimen`, h.regimen, "Régimen", REGIMEN)}
         <button class="x" onclick="ed.servicios[${i}].habitaciones.splice(${j},1);render()" title="Quitar habitación" ${s.habitaciones.length<2?"disabled":""}>×</button></div>`).join("")}
-      <button class="btn ghost sm" onclick="ed.servicios[${i}].habitaciones.push({cant:1,tipo:'Doble',camas:'Twin (2 individuales)',regimen:'${esc((s.habitaciones||[])[0]?.regimen||"Desayuno")}'});render()">Agregar otra habitación</button>`;
+      <button class="btn ghost sm" onclick="ed.servicios[${i}].habitaciones.push({cant:1,tipo:'Doble',camas:'Twin (2 individuales)',regimen:'${esc((s.habitaciones||[])[0]?.regimen||"Desayuno")}'});render()">+ Otra habitación</button></div>`;
     }
     case "aereo": return `<div class="grid g4">
-        <div class="span2">${inp(p+"aerolinea", s.aerolinea, "Aerolínea")}</div>
-        <div class="span2">${inp(p+"ruta", s.ruta, "Ruta", "text", 'placeholder="UAQ – AEP – GIG"')}</div>
+        ${inp(p+"aerolinea", s.aerolinea, "Aerolínea")}
+        ${inp(p+"ruta", s.ruta, "Ruta", "text", 'placeholder="UAQ – AEP – GIG"')}
         ${inp(p+"ida", s.ida, "Ida", "date")}${inp(p+"vuelta", s.vuelta, "Vuelta", "date")}
         ${sel(p+"equipaje", s.equipaje, "Equipaje", EQUIPAJE)}
       </div>`;
     case "traslado": return `<div class="grid g4">
         <div class="span2">${inp(p+"tramo", s.tramo, "Tramo", "text", 'placeholder="Aeropuerto San Juan – Barreal"')}</div>
-        ${inp(p+"fecha", s.fecha, "Fecha", "date")}${sel(p+"modalidad", s.modalidad, "Modalidad", ["Privado","Regular / compartido"])}
-        <div class="span2">${provSelect(p+"proveedorId", s.proveedorId, "Transporte", "Transportista")}</div></div>`;
+        ${inp(p+"fecha", s.fecha, "Fecha", "date")}${sel(p+"modalidad", s.modalidad, "Modalidad", ["Privado","Regular / compartido"])}</div>`;
     case "excursion": return `<div class="grid g4">
         <div class="span2">${inp(p+"nombre", s.nombre, "Excursión", "text", 'placeholder="Observación astronómica en El Leoncito"')}</div>
-        ${inp(p+"fecha", s.fecha, "Fecha", "date")}${sel(p+"modalidad", s.modalidad, "Modalidad", ["Regular","Privada"])}
-        <div class="span2">${provSelect(p+"proveedorId", s.proveedorId, "Excursiones", "Prestador")}</div></div>`;
+        ${inp(p+"fecha", s.fecha, "Fecha", "date")}${sel(p+"modalidad", s.modalidad, "Modalidad", ["Regular","Privada"])}</div>`;
     case "asistencia": return `<div class="grid g4">
-        <div class="span2">${provSelect(p+"proveedorId", s.proveedorId, "Asistencia al viajero", "Compañía")}</div>
-        ${inp(p+"plan", s.plan, "Plan")}<div></div>
+        <div class="span2">${inp(p+"plan", s.plan, "Plan")}</div>
         ${inp(p+"desde", s.desde, "Vigencia desde", "date")}${inp(p+"hasta", s.hasta, "Hasta", "date")}</div>`;
-    default: return `<div class="grid g2">
-        ${inp(p+"descripcion", s.descripcion, "Descripción")}
-        ${provSelect(p+"proveedorId", s.proveedorId, s.tipo==="paquete"?"Operador / Mayorista":"", "Proveedor")}
-        <label class="f spanall"><span>Qué incluye</span><textarea ${bind(p+"incluye")}>${esc(s.incluye||"")}</textarea></label></div>`;
+    default: return `<div class="grid g4">
+        <div class="span2">${inp(p+"descripcion", s.descripcion, "Descripción")}</div>
+        <label class="f span2"><span>Qué incluye</span><textarea ${bind(p+"incluye")} style="min-height:34px">${esc(s.incluye||"")}</textarea></label></div>`;
   }
 }
 function txtNoches(s){
@@ -1572,25 +1608,34 @@ function txtNoches(s){
 }
 function upNoches(i){ const el = $("noches_"+i); if(el) el.innerHTML = txtNoches(ed.servicios[i]); }
 function txtFechas(){ return ed.salida && ed.regreso && ed.regreso < ed.salida ? "El regreso es anterior a la salida." : ""; }
-function chkFechas(){ const el = $("fechaWarn"); if(el) el.textContent = txtFechas(); }
+function chkFechas(){ const el = $("fechaWarn"); if(el) el.textContent = txtFechas(); const n = $("nochesRes"); if(n) n.innerHTML = txtNochesRes(); }
+function txtNochesRes(){
+  if(!ed.salida || !ed.regreso) return `<span class="muted">—</span>`;
+  const n = diffDays(ed.salida, ed.regreso);
+  return n>0 ? n+(n===1?" noche":" noches") : n===0 ? "En el día" : "—";
+}
 function svcBloque(s, i){
-  const t = SVC[s.tipo], p = `servicios.${i}.`;
+  const t = SVC[s.tipo], p = `servicios.${i}.`, pv = SVC_PROV[s.tipo];
   const pagado = s.id ? pagadoSvc(s) : 0;
+  const sub = s.proveedorId ? nombreProv(s.proveedorId) : (s.tipo==="aereo" && s.aerolinea ? s.aerolinea : "");
+  const provFila = pv
+    ? `<div class="span2">${provSelect(p+"proveedorId", s.proveedorId, pv[0], pv[1])}</div>${s.tipo!=="paquete"?opSelect(p+"operadorId", s.operadorId):"<div></div>"}`
+    : `<div class="span2">${opSelect(p+"operadorId", s.operadorId)}</div><div></div>`;
   return `<div class="svc" style="${s.estado==="Cancelado"?"opacity:.6":""}">
-    <div class="svc-h"><span aria-hidden="true">${t.i}</span><b>${t.t}</b>
-      <div class="acts"><select onchange="ev('${p}estado',this.value,1)" style="width:auto;padding:4px 8px">${opts(ESTADOS_SVC, s.estado)}</select>
+    <div class="svc-h"><span aria-hidden="true">${t.i}</span><b>${t.t}</b>${sub?`<span class="sub">· ${esc(sub)}</span>`:""}
+      <div class="acts"><select onchange="ev('${p}estado',this.value,1)" style="width:auto;padding:4px 8px" aria-label="Estado del servicio">${opts(ESTADOS_SVC, s.estado)}</select>
         <button class="x" title="Subir" onclick="moverServicio(${i},-1)">↑</button><button class="x" title="Bajar" onclick="moverServicio(${i},1)">↓</button>
         <button class="x" title="Quitar servicio" onclick="quitarServicio(${i})">×</button></div></div>
     <div class="svc-b">${svcCampos(s,i)}
-      <div class="grid g4" style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--line)">
-        <div>${inp(p+"costo", s.costo, "Costo por persona ("+ed.moneda+")", "number", 'step="any" min="0" placeholder="Por pasajero"')}
-          <div class="tiny" id="calc_${i}" style="margin-top:4px">${txtSvc(s,ed)}</div></div>
-        ${s.tipo!=="paquete"?opSelect(p+"operadorId", s.operadorId):"<div></div>"}
+      <div class="svc-row"><div class="svc-sec">Proveedor y pago</div><div class="grid g4">
+        ${provFila}
         ${inp(p+"localizador", s.localizador, s.tipo==="aereo"?"PNR / código":"N.º de confirmación")}
+        <div>${inp(p+"costo", s.costo, "Costo por persona ("+ed.moneda+")", "number", 'step="any" min="0" placeholder="Por pasajero"')}
+          <div class="tiny" id="calc_${i}" style="margin-top:3px">${txtSvc(s,ed)}</div></div>
         ${inp(p+"vtoPago", s.vtoPago, "Vence pago a proveedor", "date")}
-        <div class="spanall">${inp(p+"notas", s.notas, "Notas del servicio")}</div>
+        <div class="span2">${inp(p+"notas", s.notas, "Notas del servicio")}</div>
       </div>
-      ${pagado?`<div class="tiny" style="margin-top:8px">Pagado al proveedor: ${money(pagado,ed.moneda)}</div>`:""}
+      ${pagado?`<div class="tiny" style="margin-top:6px">Pagado al proveedor: ${money(pagado,ed.moneda)}</div>`:""}</div>
     </div></div>`;
 }
 function txtSvc(s, r){
@@ -1611,62 +1656,80 @@ function resumenHTML(r){
 }
 function updSum(){
   if(ed && ed._paq){ const k = $("pkSum"); if(k) k.innerHTML = resumenPaq(ed); return; }
-  const el = $("edSum"); if(el) el.innerHTML = resumenHTML(ed);
+  const el = $("edSum"); if(el) el.innerHTML = barraHTML(ed);
   ed.servicios.forEach((s,i)=>{ const c = $("calc_"+i); if(c) c.innerHTML = txtSvc(s,ed); });
+}
+
+/* Totales del editor: barra fija abajo, siempre a la vista. */
+function barraHTML(r){
+  const v = totalVenta(r), c = totalCosto(r), n = paxCount(r);
+  const m = (lb, val) => `<div class="m"><span>${lb}</span><b>${val}</b></div>`;
+  return m("Pasajeros", n||`<span style="color:var(--wine)">—</span>`) + m("Venta total", money(v,r.moneda)) + m("Costo total", money(c,r.moneda)) +
+    m("Ganancia", money(v-c,r.moneda)) + m("Margen", v?Math.round((v-c)/v*1000)/10+"%":"—") +
+    (r.id ? m("Saldo del cliente", money(r.estado==="Cancelada"?0:v-cobrado(r),r.moneda)) : "");
 }
 
 VIEWS.resEdit = function(){
   if(!ed) return VIEWS.reservas();
   const r = ed;
   const clis = sortBy(DB.clientes,nom).map(c=>({v:c.id,t:nom(c)+(c.doc?" · "+c.doc:"")}));
-  const dests = sortBy(DB.destinos,d=>d.nombre).map(d=>({v:d.id,t:d.nombre+(d.provincia?" ("+d.provincia+")":"")}));
   const titular = byId(DB.clientes, r.clienteId);
+  const leads = sortBy(DB.leads.filter(l=>l.id===r.leadId || (leadAbierto(l) || (l.etapa==="Reservado" && !l.reservaId))), l=>l.nombre).map(l=>({v:l.id,t:`${l.nombre} · ${l.etapa} · ${l.id}`}));
   return head(r.id ? "Editar reserva "+r.id : "Nueva reserva", "Solo cliente y destino son obligatorios. El resto se completa cuando lo tengas.",
       `<button class="btn sec" onclick="cancelarEdicion()">Descartar cambios</button><button class="btn" onclick="guardarReserva()">Guardar reserva</button>`) +
-  `<div class="ed"><div>
-    <div class="box"><h2>Datos generales</h2><div class="grid g4">
-      <label class="f req span2"><span>Cliente titular</span><div class="withadd"><select onchange="cambiarCliente(this.value)">${opts(clis, r.clienteId, "Elegí un cliente")}</select>
-        <button class="btn sec sm" onclick="editar('clientes',null,id=>cambiarCliente(id))">Nuevo</button></div></label>
-      <div class="f req span2"><span>Destino</span><div class="withadd">${combo("dest", destItems(), r.destinoId, "Buscá por nombre, provincia o país…", v=>ev("destinoId",v,1))}
-        <button class="btn sec sm" onclick="editar('destinos',null,id=>{ed.destinoId=id;render()})">Nuevo</button></div>
-        ${r.destinoId?`<span class="hint">Motor: ${motorDe(r)==="receptivo"?"receptivo":"emisivo"}</span>`:""}</div>
-      <div class="span2">${inp("titulo", r.titulo, "Nombre de la reserva (opcional)", "text", 'placeholder="Ej.: Fiambalá vacaciones de invierno"')}</div>
-      ${inp("salida", r.salida, "Salida", "date", `onchange="chkFechas()"`)}
-      ${inp("regreso", r.regreso, "Regreso", "date", `onchange="chkFechas()"`)}
-      ${sel("estado", r.estado, "Estado", ESTADOS_RES)}
-      <label class="f"><span>Moneda de la reserva</span><select ${bindR("moneda")}>${opts(MONEDAS, r.moneda)}</select></label>
-      ${inp("fechaAlta", r.fechaAlta, "Fecha de venta", "date")}
-      <label class="f"><span>Canal de venta</span><select onchange="ev('canal',this.value)">${opts(DB.cfg.canales, r.canal, "—")}</select></label>
-      ${inp("vtoSaldo", r.vtoSaldo, "Vence el saldo (cliente)", "date")}
-      <label class="f span2"><span>Lead de origen</span><select onchange="ev('leadId',this.value)">${opts(
-        sortBy(DB.leads.filter(l=>l.id===r.leadId || (leadAbierto(l) || (l.etapa==="Reservado" && !l.reservaId))), l=>l.nombre).map(l=>({v:l.id,t:`${l.nombre} · ${l.etapa} · ${l.id}`})), r.leadId, "Ninguno (venta sin consulta previa)")}</select>
-        <span class="hint">Al guardar, el lead pasa a Reservado.</span></label>
-      <label class="f spanall"><span>Notas internas</span><textarea ${bind("notas")}>${esc(r.notas)}</textarea></label>
-    </div><div class="hint" id="fechaWarn" style="color:var(--wine);margin-top:6px">${txtFechas()}</div></div>
+  `<div class="re">
+    <div class="box"><h2>Datos de la reserva</h2>
+      <div class="grp"><div class="gl">Cliente</div><div class="grid g3">
+        <label class="f req span2"><span>Cliente titular</span><div class="withadd"><select onchange="cambiarCliente(this.value)">${opts(clis, r.clienteId, "Elegí un cliente")}</select>
+          <button class="btn sec sm" onclick="editar('clientes',null,id=>cambiarCliente(id))">Nuevo</button></div></label>
+        <label class="f"><span>Lead de origen</span><select onchange="ev('leadId',this.value)" title="Al guardar, el lead pasa a Reservado.">${opts(leads, r.leadId, "Ninguno")}</select></label>
+      </div></div>
+
+      <div class="grp"><div class="gl">Viaje</div><div class="grid g3">
+        <div class="f req span2"><span>Destino${r.destinoId?` <span class="tiny">· ${motorDe(r)==="receptivo"?"receptivo":"emisivo"}</span>`:""}</span><div class="withadd">${combo("dest", destItems(), r.destinoId, "Buscá por nombre, provincia o país…", v=>ev("destinoId",v,1))}
+          <button class="btn sec sm" onclick="editar('destinos',null,id=>{ed.destinoId=id;render()})">Nuevo</button></div></div>
+        ${inp("titulo", r.titulo, "Nombre de la reserva", "text", 'placeholder="Opcional"')}
+        ${inp("salida", r.salida, "Salida", "date", `onchange="chkFechas()"`)}
+        ${inp("regreso", r.regreso, "Regreso", "date", `onchange="chkFechas()"`)}
+        <div class="f"><span>Duración</span><div class="ro" id="nochesRes">${txtNochesRes()}</div></div>
+      </div><div class="hint" id="fechaWarn" style="color:var(--wine);margin-top:4px">${txtFechas()}</div></div>
+
+      <div class="grp"><div class="gl">Venta</div><div class="grid g3">
+        ${inp("fechaAlta", r.fechaAlta, "Fecha de venta", "date")}
+        <label class="f"><span>Canal de venta</span><select onchange="ev('canal',this.value)">${opts(DB.cfg.canales, r.canal, "—")}</select></label>
+        ${sel("estado", r.estado, "Estado", ESTADOS_RES)}
+        <label class="f"><span>Moneda</span><select ${bindR("moneda")}>${opts(MONEDAS, r.moneda)}</select></label>
+        ${inp("tarifaPax", r.tarifaPax, "Tarifa por persona ("+r.moneda+")", "number", 'step="any" min="0" placeholder="Lo que cobrás por pasajero" style="font-weight:650"')}
+        ${inp("vtoSaldo", r.vtoSaldo, "Vence el saldo (cliente)", "date")}
+      </div></div>
+
+      <div class="grp"><div class="gl">Notas</div><div>
+        <textarea aria-label="Notas internas" ${bind("notas")} placeholder="Notas internas (no salen en el contrato)" style="min-height:44px">${esc(r.notas)}</textarea>
+      </div></div>
+    </div>
 
     <div class="box"><div class="sect-h"><h2>Pasajeros <span class="tiny">${r.pasajeros.length}</span></h2><div class="acts">
       ${titular && !r.pasajeros.some(p=>p.clienteId===titular.id || (titular.doc && p.doc===titular.doc))?`<button class="btn ghost sm" onclick="agregarPax(1)">Sumar al titular</button>`:""}
       <button class="btn sec sm" onclick="agregarPax()">Agregar pasajero</button></div></div>
-      ${r.pasajeros.length ? r.pasajeros.map((p,j)=>`<div class="pax">
-        ${inp(`pasajeros.${j}.nombre`, p.nombre, "Nombre y apellido")}
-        ${inp(`pasajeros.${j}.doc`, p.doc, "DNI / pasaporte")}
-        ${inp(`pasajeros.${j}.nac`, p.nac, "Nacimiento", "date")}
-        ${sel(`pasajeros.${j}.tipo`, p.tipo, "Tipo", TIPO_PAX)}
+      ${r.pasajeros.length ? `<div class="tbl-h cols-pax"><span>Nombre y apellido</span><span>DNI / pasaporte</span><span>Nacimiento</span><span>Tipo</span><span></span></div>` +
+        r.pasajeros.map((p,j)=>`<div class="tbl-r cols-pax">
+        ${cin(`pasajeros.${j}.nombre`, p.nombre, "Nombre y apellido", "text", 'placeholder="Nombre y apellido"')}
+        ${cin(`pasajeros.${j}.doc`, p.doc, "DNI / pasaporte", "text", 'placeholder="DNI / pasaporte"')}
+        ${cin(`pasajeros.${j}.nac`, p.nac, "Nacimiento", "date")}
+        ${csel(`pasajeros.${j}.tipo`, p.tipo, "Tipo de pasajero", TIPO_PAX)}
         <button class="x" onclick="ed.pasajeros.splice(${j},1);render()" title="Quitar">×</button></div>`).join("")
       : `<div class="row">${inp("paxEstimados", r.paxEstimados, "Pasajeros estimados", "number", 'style="max-width:120px"')}<span class="hint" style="align-self:end;padding-bottom:9px">Podés cargar los nombres más adelante.</span></div>`}
     </div>
 
-    <div class="box"><div class="sect-h"><h2>Servicios</h2></div>
-      ${r.servicios.map(svcBloque).join("") || `<div class="muted small" style="margin-bottom:12px">Sin servicios. Agregá lo que compone el viaje con su costo total: alojamiento, aéreo, traslados… o un paquete cerrado de un operador.</div>`}
+    <div class="box"><div class="sect-h"><h2>Servicios <span class="tiny">${r.servicios.length}</span></h2></div>
+      ${r.servicios.map(svcBloque).join("") || `<div class="muted small" style="margin-bottom:12px">Sin servicios. Agregá lo que compone el viaje: alojamiento, aéreo, traslados… o un paquete cerrado de un operador.</div>`}
       <div class="addtype">${DB.paquetes.some(p=>p.activo!=="No")?`<button class="btn sm" onclick="formPaquete()">▣ Cargar paquete armado</button>`:""}${Object.entries(SVC).map(([k,t])=>`<button class="btn sec sm" onclick="nuevoServicio('${k}')">+ ${t.t}</button>`).join("")}</div>
+      <div class="tiny" style="margin-top:10px">Todo se carga por persona: el costo de cada servicio y la tarifa de venta. El sistema multiplica por la cantidad de pasajeros.</div>
     </div>
-  </div>
-  <aside class="sticky"><div class="box"><h2>Resumen</h2>
-    <label class="f" style="margin-bottom:10px"><span>Tarifa de venta por persona (${r.moneda})</span>
-      <input type="number" step="any" min="0" value="${esc(r.tarifaPax)}" ${bind("tarifaPax")} placeholder="Lo que cobrás por pasajero" style="font-size:17px;font-weight:650"></label>
-    <div id="edSum">${resumenHTML(r)}</div>
-    <div class="row" style="margin-top:16px"><button class="btn" style="flex:1" onclick="guardarReserva()">Guardar reserva</button></div>
-    <div class="tiny" style="margin-top:10px">Todo se carga por persona: el costo de cada servicio y acá la tarifa de venta. El sistema multiplica por la cantidad de pasajeros de la reserva.</div></div></aside></div>`;
+
+    <div class="re-bar"><div id="edSum" style="display:contents">${barraHTML(r)}</div>
+      <div class="acts"><button class="btn" onclick="guardarReserva()">Guardar reserva</button></div></div>
+  </div>`;
 };
 function agregarPax(titular){
   if(titular){ const c = byId(DB.clientes, ed.clienteId);
