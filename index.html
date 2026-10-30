@@ -1816,6 +1816,72 @@ function cbPick(key, k){
   C.onPick(it.v);
 }
 
+/* ── listas largas con buscador ──
+   Todo <select> que liste registros del CRM (valores tipo CLI-0001, PRV-0003…) o que tenga más de 10 opciones
+   se muestra como buscador. El <select> queda oculto y sigue siendo el que guarda el valor:
+   al elegir, se le cambia el valor y se dispara su "change", así que sus onchange funcionan igual que antes. */
+const SB_MAX_FIJA = 10, SB_ID = /^[A-Z]{3}-\d+$/;
+function sbConviene(sel){
+  if(sel.multiple || sel.dataset.sb) return false;
+  const o = [...sel.options].filter(x=>x.value!=="");
+  return o.length > SB_MAX_FIJA || (o.length>0 && o.every(x=>SB_ID.test(x.value)));
+}
+function sbItems(sel){
+  return [...sel.options].map(o=>{ const g = o.parentElement.tagName==="OPTGROUP" ? o.parentElement.label : "";
+    return {v:o.value, t:o.text, g, q:normTxt(o.text+" "+o.value+" "+g)}; });
+}
+function sbTexto(sel){ const o = sel.options[sel.selectedIndex]; return o && o.value!=="" ? o.text : ""; }
+function sbMejorar(sel){
+  sel.dataset.sb = "1";
+  const blank = [...sel.options].find(o=>o.value==="");
+  const box = document.createElement("div"); box.className = "combo";
+  if(sel.style.width==="auto"){ box.style.flex = "0 0 240px"; box.style.maxWidth = "100%"; }
+  const lbl = sel.getAttribute("aria-label") || sel.closest(".f")?.querySelector("span")?.textContent || "";
+  box.innerHTML = `<input autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list"><div class="combo-list" hidden></div>`;
+  const inp = box.firstChild, list = box.lastChild;
+  inp.placeholder = blank && blank.text!=="—" ? blank.text : "Buscá…";
+  if(lbl) inp.setAttribute("aria-label", lbl);
+  inp.value = sbTexto(sel); inp.disabled = sel.disabled;
+  sel.style.display = "none"; sel.after(box);
+  let vis = [], act = 0;
+  const abrir = todo => {
+    const words = todo ? [] : normTxt(inp.value).split(/\s+/).filter(Boolean);
+    const items = sbItems(sel).filter(i=>!(i.v==="" && i.t==="—"));
+    vis = items.filter(i=>words.every(w=>i.q.includes(w)));
+    if(words.length) vis.sort((a,b)=>(normTxt(b.t).startsWith(words[0])?1:0)-(normTxt(a.t).startsWith(words[0])?1:0));
+    act = Math.max(0, todo ? vis.findIndex(i=>i.v===sel.value) : 0);
+    let g0 = null;
+    list.innerHTML = (words.length?`<div class="combo-n">${vis.length} ${vis.length===1?"resultado":"resultados"}</div>`:"") +
+      (vis.length ? vis.map((i,k)=>{ const gh = !words.length && i.g && i.g!==g0 ? `<div class="combo-n">${esc(i.g)}</div>` : ""; g0 = i.g;
+        return gh+`<div class="combo-opt${k===act?" act":""}${i.v===sel.value?" cur":""}" data-k="${k}"><span>${esc(i.t)}</span>${words.length&&i.g?`<span class="s">${esc(i.g)}</span>`:""}</div>`; }).join("")
+      : `<div class="combo-empty">Sin resultados.</div>`);
+    list.hidden = false;
+    list.querySelector(".combo-opt.act")?.scrollIntoView({block:"nearest"});
+  };
+  const elegir = k => {
+    const it = vis[k]; if(!it) return;
+    list.hidden = true; inp.value = it.v==="" ? "" : it.t;
+    if(sel.value !== it.v){ sel.value = it.v; sel.dispatchEvent(new Event("change", {bubbles:true})); }
+  };
+  inp.addEventListener("focus", ()=>{ inp.select(); abrir(true); });
+  inp.addEventListener("input", ()=>abrir(false));
+  inp.addEventListener("keydown", e=>{
+    if(list.hidden && (e.key==="ArrowDown"||e.key==="Enter")){ abrir(true); e.preventDefault(); return; }
+    if(e.key==="ArrowDown"||e.key==="ArrowUp"){
+      e.preventDefault(); if(!vis.length) return;
+      act = (act + (e.key==="ArrowDown"?1:-1) + vis.length) % vis.length;
+      list.querySelectorAll(".combo-opt").forEach((o,k)=>o.classList.toggle("act",k===act));
+      list.querySelectorAll(".combo-opt")[act]?.scrollIntoView({block:"nearest"});
+    } else if(e.key==="Enter"){ e.preventDefault(); if(vis.length) elegir(act); }
+    else if(e.key==="Escape"){ inp.blur(); }
+  });
+  inp.addEventListener("blur", ()=>setTimeout(()=>{ if(!box.isConnected) return; list.hidden = true; inp.value = sbTexto(sel); }, 120));
+  list.addEventListener("mousedown", e=>{ e.preventDefault(); const o = e.target.closest(".combo-opt"); if(o) elegir(+o.dataset.k); });
+}
+let sbPend = false;
+function sbRevisar(){ sbPend = false; document.querySelectorAll("select:not([data-sb])").forEach(sel=>{ if(sbConviene(sel)) sbMejorar(sel); }); }
+new MutationObserver(()=>{ if(!sbPend){ sbPend = true; requestAnimationFrame(sbRevisar); } }).observe(document.body, {childList:true, subtree:true});
+
 function cancelarEdicion(){ const id = ed?.id; ed = null; id ? go("reserva", id) : go("reservas"); }
 function guardarReserva(){
   if(!ed.clienteId) return toast("Elegí el cliente titular.");
