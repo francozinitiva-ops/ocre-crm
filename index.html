@@ -1699,7 +1699,7 @@ VIEWS.resEdit = function(){
         <label class="f"><span>Canal de venta</span><select onchange="ev('canal',this.value)">${opts(DB.cfg.canales, r.canal, "—")}</select></label>
         ${sel("estado", r.estado, "Estado", ESTADOS_RES)}
         <label class="f"><span>Moneda</span><select ${bindR("moneda")}>${opts(MONEDAS, r.moneda)}</select></label>
-        ${inp("tarifaPax", r.tarifaPax, "Tarifa por persona ("+r.moneda+")", "number", 'step="any" min="0" placeholder="Lo que cobrás por pasajero" style="font-weight:650"')}
+        ${inp("tarifaPax", r.tarifaPax, "Tarifa de venta por persona ("+r.moneda+")", "number", 'step="any" min="0" placeholder="Lo que cobrás por pasajero" style="font-weight:650;border-color:var(--terra);background:var(--paper2)"')}
         ${inp("vtoSaldo", r.vtoSaldo, "Vence el saldo (cliente)", "date")}
       </div></div>
 
