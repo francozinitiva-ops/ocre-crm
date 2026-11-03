@@ -891,12 +891,13 @@ function cuentas(){
   const R = DB.reservas, vivas = R.filter(r=>r.estado!=="Cancelada"), canc = R.filter(r=>r.estado==="Cancelada");
   const inicial = DB.cfg.cajaInicial || {};
   const cobros = sumM(DB.cobros.filter(c=>!c.anulado), c=>c.moneda, c=>c.monto);
-  const pagos = sumM(DB.pagosProv, monPago, p=>p.monto);
+  const pagos = sumM(DB.pagosProv.filter(p=>n0(p.monto)>0), monPago, p=>p.monto);
+  const reintegros = sumM(DB.pagosProv.filter(p=>n0(p.monto)<0), monPago, p=>-n0(p.monto));
   const gastos = sumM(DB.egresos.filter(esGasto), e=>e.moneda, e=>e.monto);
   const retiros = sumM(DB.egresos.filter(e=>!esGasto(e)), e=>e.moneda, e=>e.monto);
   const devoluciones = sumM(canc, monR, salioDevolucion);
   const caja = sumM(MON_ORD, k=>k, k=>inicial[k]);
-  Object.entries(cobros).forEach(([k,v])=>caja[k] = (caja[k]||0) + v);
+  [cobros,reintegros].forEach(m=>Object.entries(m).forEach(([k,v])=>caja[k] = (caja[k]||0) + v));
   [pagos,gastos,retiros,devoluciones].forEach(m=>Object.assign(caja, subM(caja, m)));
   const prov = sumM(vivas, monR, r=>Math.min(Math.max(0, cobrado(r)-pagadoProv(r)), deudaProv(r)));
   canc.forEach(r=>{ const v = Math.min(Math.max(0, cobrado(r)-pagadoProv(r)-salioDevolucion(r)), penalPorPagar(r)); if(v) prov[r.moneda] = (prov[r.moneda]||0)+v; });
@@ -904,7 +905,7 @@ function cuentas(){
   canc.forEach(r=>{ const v = debeCliente(r); if(v) clientes[r.moneda] = (clientes[r.moneda]||0)+v; });
   const ganancia = subM(subM(caja, prov), clientes);
   const conAdelanto = vivas.filter(r=>pagadoProv(r)-cobrado(r)>0.5);
-  return {inicial, cobros, pagos, gastos, retiros, devoluciones, caja, prov, clientes, ganancia, conAdelanto,
+  return {inicial, cobros, pagos, reintegros, gastos, retiros, devoluciones, caja, prov, clientes, ganancia, conAdelanto,
     adelantos: sumM(conAdelanto, monR, r=>pagadoProv(r)-cobrado(r)),
     deboOps: (()=>{ const m = sumM(vivas, monR, deudaProv); canc.forEach(r=>{ const v = penalPorPagar(r); if(v) m[r.moneda] = (m[r.moneda]||0)+v; }); return m; })(),
     deboPenal: sumM(canc, monR, penalPorPagar),
@@ -1279,7 +1280,8 @@ function panelPlata(){
   const celdaCaja = (m,x) => { const v = m[x]||0; return `<div class="v ${v<-0.5?"res-neg":""}">${money(v,x)}</div>`; };
   const linea = (lab, m, signo) => monsM(m).length ? `<div><span>${lab}</span><b>${monsM(m).map(x=>(signo||"")+money(m[x],x)).join(" · ")}</b></div>` : "";
   const entroMes = sumM(DB.cobros.filter(c=>!c.anulado && mesDe(c.fecha)===panelMes), c=>c.moneda, c=>c.monto);
-  const salioMes = (()=>{ const m = sumM(DB.pagosProv.filter(p=>mesDe(p.fecha)===panelMes), monPago, p=>p.monto);
+  DB.pagosProv.filter(p=>n0(p.monto)<0 && mesDe(p.fecha)===panelMes).forEach(p=>{ const x = monPago(p); entroMes[x] = (entroMes[x]||0)-n0(p.monto); });
+  const salioMes = (()=>{ const m = sumM(DB.pagosProv.filter(p=>n0(p.monto)>0 && mesDe(p.fecha)===panelMes), monPago, p=>p.monto);
     DB.egresos.filter(e=>mesDe(e.fecha)===panelMes).forEach(e=>m[e.moneda||"ARS"] = (m[e.moneda||"ARS"]||0)+n0(e.monto));
     DB.reservas.forEach(r=>{ const dv = devDe(r); if(salioDevolucion(r) && mesDe(dv.fechaDev)===panelMes) m[r.moneda] = (m[r.moneda]||0)+salioDevolucion(r); });
     return m; })();
@@ -1334,6 +1336,7 @@ function panelPlata(){
           ${linea("Plata inicial", sumM(MON_ORD, x=>x, x=>C.inicial[x]))}
           ${linea("Cobraste a clientes", C.cobros, "+ ")}
           ${linea("Pagaste a operadores", C.pagos, "− ")}
+          ${linea("Te devolvieron proveedores", C.reintegros, "+ ")}
           ${linea("Gastos de la agencia", C.gastos, "− ")}
           ${linea("Retiros de socios", C.retiros, "− ")}
           ${linea("Devoluciones a clientes", C.devoluciones, "− ")}
@@ -2256,6 +2259,8 @@ function devBoxHTML(r){
         ${d.penalidad?`<dt>Penalidades</dt><dd>− ${m(d.penalidad)}</dd>`:""}
         ${d.gestion?`<dt>Cargo de gestión</dt><dd>− ${m(d.gestion)}</dd>`:""}
         <dt><b>${cred?"Crédito a favor":"A devolver"}</b></dt><dd><b>${m(d.monto)}</b> ${est}</dd>
+        ${pagadoProv(r)!==0||n0(d.penalidad)?(()=>{ const pp = DB.pagosProv.filter(p=>p.reservaId===r.id), ida = sum(pp, p=>Math.max(0,n0(p.monto))), vuelta = sum(pp, p=>Math.max(0,-n0(p.monto)));
+          return `<dt>Con proveedores</dt><dd>Les pagaste ${m(ida)}${vuelta?` · te devolvieron ${m(vuelta)}`:""} · se quedan ${m(d.penalidad)}</dd>`; })():""}
         ${Math.abs(ganCancel(r))>0.5?`<dt>Te queda de ganancia</dt><dd>${m(ganCancel(r))}</dd>`:""}
         ${d.nota?`<dt>Nota</dt><dd>${esc(d.nota)}</dd>`:""}
         ${d.notaDev?`<dt>${cred?"Uso":"Comprobante"}</dt><dd>${esc(d.notaDev)}</dd>`:""}
