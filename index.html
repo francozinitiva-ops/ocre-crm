@@ -194,38 +194,64 @@ tfoot td{font-weight:650;background:var(--paper2);border-bottom:0}
 .krow.boxed .k.click:hover{border-color:var(--terra)}
 .krow.boxed .k.alert{border-color:var(--terra)}
 .dgrid>.box{margin-top:0}
-/* ── plata del panel ── */
-.plata{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:6px 0 22px;align-items:start}
-.pc{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:16px 18px 10px;box-shadow:0 1px 2px rgba(40,30,15,.05)}
-.pc-h{display:flex;align-items:baseline;gap:8px}
-.pc-h h3{font-size:15.5px;margin:0}
-.pc-h .tag{margin-left:auto}
-.pc .q{font-size:12px;color:var(--ink3);margin:3px 0 10px}
-.pr{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:8px 0;border-top:1px dashed var(--line)}
-.pr .l{font-size:13.5px;min-width:0}
-.pr .l small{display:block;font-size:11.5px;color:var(--ink3);line-height:1.35;margin-top:1px}
-.pr .v{font-weight:650;text-align:right;white-space:nowrap;font-size:15px;line-height:1.3}
-.pr.big .v{font-size:20px;font-stretch:106%}
-.pr.big .l{font-weight:600}
-.pr .l small{font-weight:400}
-.pr .v .neg{color:var(--terra)}
-.pr.good .v .neg{color:var(--terra)}
-.pr.tot{border-top:2px solid var(--ink)}
-.pr.sub{padding:5px 0 5px 14px;border-top:0}
-.pr.sub .l{color:var(--ink2);font-size:12.5px}
-.pr.sub .v{font-size:13.5px;font-weight:600;color:var(--ink2)}
-.pr .op{display:inline-block;width:14px;color:var(--ink3);font-weight:700}
-.pr.alert .v{color:var(--terra)}
-.pr.good .v{color:#4C5530}
-.pr .v .pos,.pr .v .negb{display:inline-block;color:#fff;padding:2px 10px;border-radius:6px;margin:2px 0}
-.pr .v .pos{background:#3E7B38}
-.pr .v .negb{background:var(--terra)}
-.pr .v .cero{color:var(--ink3);display:inline-block;padding:2px 10px}
-.pr.click{cursor:pointer}.pr.click:hover .l{color:var(--terraD);text-decoration:underline}
-.pr.sep{margin-top:6px}
-.pc-alert{display:flex;gap:8px;align-items:center;font-size:12.5px;background:var(--terraS);color:var(--terraD);border-radius:5px;padding:6px 10px;margin:4px 0 6px;cursor:pointer}
+/* ── plata del panel: cuánto gano, cuánto debo, cuánto me deben, caja ── */
+.din{margin:6px 0 22px}
+.din-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 10px}
+.din-h h2{font-size:16px;margin:0}
+.din-nav{margin-left:auto;display:flex;align-items:center;gap:4px}
+.din-nav input{width:auto}
+.din-card{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:16px 18px;box-shadow:0 1px 2px rgba(40,30,15,.05);min-width:0}
+.din-mes{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:28px;margin-bottom:16px}
+.eq{display:grid;grid-template-columns:repeat(2,minmax(0,1fr) auto) minmax(0,1fr);gap:10px;align-items:start}
+.eq .op{font-size:22px;line-height:1;color:var(--ink3);padding-top:24px}
+.eq .lb{font-size:13px;font-weight:600;color:var(--ink2);margin-bottom:5px}
+.eq .lb.click{cursor:pointer}.eq .lb.click:hover{color:var(--terraD);text-decoration:underline}
+.eq .val,.din-big{font-size:23px;font-weight:700;line-height:1.3;white-space:nowrap;font-variant-numeric:tabular-nums}
+.eq small{display:block;font-size:11.5px;line-height:1.35;color:var(--ink3);margin-top:4px}
+.res-pos{color:#2E7D3A}.res-neg{color:var(--terraD)}.res-cero{color:var(--ink3)}
+.din details{margin-top:14px;border-top:1px dashed var(--line);padding-top:9px;font-size:13px}
+.din summary{cursor:pointer;color:var(--ink2);font-size:12.5px}
+.din summary:hover{color:var(--terraD)}
+.din-lista{margin-top:8px}
+.din-lista div{display:flex;justify-content:space-between;gap:12px;padding:4px 0}
+.din-lista div.click{cursor:pointer}.din-lista div.click:hover span:first-child{color:var(--terraD);text-decoration:underline}
+.din-lista b{font-weight:650;white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
+.din-lista div.tot{border-top:2px solid var(--ink);margin-top:3px;padding-top:6px;font-weight:650}
+.din-meses{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+.din-meses th{text-align:right;font-weight:500;font-size:11.5px;color:var(--ink3);padding:4px 0 5px 10px}
+.din-meses th:first-child,.din-meses td:first-child{text-align:left;padding-left:8px}
+.din-meses th:last-child,.din-meses td:last-child{padding-right:8px}
+.din-meses td{text-align:right;padding:5px 0 5px 10px;border-top:1px dashed var(--line);white-space:nowrap;vertical-align:top}
+.din-meses tbody tr{cursor:pointer}.din-meses tbody tr:hover td:first-child{color:var(--terraD);text-decoration:underline}
+.din-meses tr.cur td{font-weight:650;background:var(--paper2)}
+.din-meses tfoot td{border-top:2px solid var(--ink);font-weight:650}
+.din-hoy{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.6fr);gap:16px;align-items:start}
+.din-card h3{font-size:14px;font-weight:600;color:var(--ink2);margin:0 0 4px}
+.din-sub{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:7px 0;border-top:1px dashed var(--line);font-size:13px}
+.din-big+.din-sub{margin-top:9px}
+.din-sub.click{cursor:pointer}.din-sub.click:hover .l{color:var(--terraD);text-decoration:underline}
+.din-sub small{display:block;font-size:11.5px;line-height:1.35;color:var(--ink3);margin-top:1px}
+.din-sub .v{font-weight:650;white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
+.pc-alert{display:flex;gap:8px;align-items:center;font-size:12.5px;background:var(--terraS);color:var(--terraD);border-radius:5px;padding:6px 10px;margin:8px 0 2px;cursor:pointer}
+.pc-alert.fijo{cursor:default}
 .pc-alert b{font-weight:700}
-@media (max-width:1100px){.plata{grid-template-columns:1fr}}
+.caja{display:grid;align-items:baseline}
+.caja>.fila{display:contents}
+.caja>.fila>*{padding:7px 0;border-top:1px dashed var(--line);font-size:13px}
+.caja>.fila>.v{font-weight:650;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;padding-left:18px}
+.caja>.fila small{display:block;font-size:11.5px;line-height:1.35;color:var(--ink3);margin-top:1px;font-weight:400}
+.caja>.tope{font-size:14px;font-weight:600;color:var(--ink2);padding-bottom:6px}
+.caja>.tope.v{font-size:23px;font-weight:700;color:var(--ink);line-height:1.3;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;padding-left:18px}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:7px;vertical-align:-1px}
+.cbar{grid-column:1/-1;display:flex;gap:2px;height:12px;margin:2px 0 11px;align-items:stretch}
+.cbar i{display:block;min-width:3px}
+.cbar i:first-child{border-radius:4px 0 0 4px}.cbar i:last-child{border-radius:0 4px 4px 0}.cbar i:only-child{border-radius:4px}
+.cbar-m{grid-column:1/-1;font-size:11px;color:var(--ink3);margin-bottom:2px}
+@media (max-width:1100px){.din-mes,.din-hoy{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:560px){.eq{grid-template-columns:minmax(0,1fr)}.eq .op{display:none}.eq .val,.din-big,.caja>.tope.v{font-size:21px}
+  .caja{grid-template-columns:repeat(var(--n),minmax(0,1fr))!important}
+  .caja>.tope:not(.v),.caja>.fila>div:first-child{grid-column:1/-1}
+  .caja>.fila>.v{border-top:0;padding-top:0;padding-left:0;text-align:left}.caja>.tope.v{text-align:left;padding-left:0}}
 .egk .k{border:0;padding:0}
 .dgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:20px}
 .bars{display:flex;align-items:flex-end;gap:6px;height:150px;padding-top:10px}
@@ -468,7 +494,8 @@ const CFG_DEF = {
   medios:["Efectivo","Transferencia","Mercado Pago","Tarjeta de débito","Tarjeta de crédito","Depósito","Otro"],
   canales:["WhatsApp","Referido","Instagram","Facebook","Web","Llamada","Presencial","Otro"],
   localidades:["Albardón","Capital","Rawson","Rivadavia","Chimbas","Santa Lucía","Pocito","Caucete","Zonda","Ullum","9 de Julio","San Martín","Angaco","25 de Mayo","Sarmiento","Jáchal","Iglesia","Calingasta","Valle Fértil","Otra provincia"],
-  catEgresos:["Alquiler","Servicios (luz, internet, teléfono)","Marketing y publicidad","Software y suscripciones","Impuestos y tasas","Contador","Comisiones bancarias","Sueldos y honorarios","Movilidad","Insumos de oficina","Varios"],
+  catEgresos:["Alquiler","Servicios (luz, internet, teléfono)","Marketing y publicidad","Software y suscripciones","Impuestos y tasas","Contador","Comisiones bancarias","Sueldos y honorarios","Movilidad","Insumos de oficina","Varios","Retiro de socios"],
+  cajaInicial:{ARS:0, USD:0, BRL:0},
   ciudad:"San Juan",
   segmentos:["Turista urbano","Curioso del paisaje y el cosmos","Pareja / escapada","Familia","Grupo / jubilados","Corporativo"],
   presupuestos:["Económico","Medio","Medio-alto","Premium"],
@@ -527,6 +554,8 @@ function merge(p){
   DB = Object.assign(clone(BLANK), p);
   DB.cfg = Object.assign(clone(CFG_DEF), p.cfg||{});
   DB.cfg.tc = Object.assign(clone(CFG_DEF.tc), (p.cfg||{}).tc||{});
+  DB.cfg.cajaInicial = Object.assign(clone(CFG_DEF.cajaInicial), (p.cfg||{}).cajaInicial||{});
+  if(!DB.cfg.catEgresos.includes(CAT_RETIRO)) DB.cfg.catEgresos.push(CAT_RETIRO);
   DB.cont = Object.assign(clone(BLANK.cont), p.cont||{});
   DB.reservas.forEach(migrarReserva);
   DB.leads.forEach(l=>{ if(l.etapa==="Ganado") l.etapa = "Reservado"; });
@@ -824,6 +853,68 @@ const devDe = r => r.estado==="Cancelada" ? r.devolucion : null;
 const devPendiente = r => { const d = devDe(r); return d && d.forma!=="Crédito a favor" && d.estado!=="Hecha" ? n0(d.monto) : 0; };
 const creditoVivo = r => { const d = devDe(r); return d && d.forma==="Crédito a favor" && d.estado!=="Usado" ? n0(d.monto) : 0; };
 
+/* ═════════════ LAS CUENTAS DEL PANEL ═════════════
+   Una reserva cancelada deja tres cuentas: lo que se le debe al cliente, lo que el proveedor retiene
+   (penalidad) y lo que le queda a la agencia. Si le pagaste al proveedor menos que la penalidad, le debés
+   la diferencia; si le pagaste más, te la tiene que devolver (se registra como un pago negativo). */
+const CAT_RETIRO = "Retiro de socios";
+const esGasto = e => e.categoria !== CAT_RETIRO;
+const monPago = p => (byId(DB.reservas,p.reservaId)||{}).moneda || "ARS";
+const penalidadDe = r => n0((devDe(r)||{}).penalidad);
+const penalPorPagar = r => r.estado==="Cancelada" ? Math.max(0, penalidadDe(r) - pagadoProv(r)) : 0;
+const aReclamarProv = r => r.estado==="Cancelada" ? Math.max(0, pagadoProv(r) - penalidadDe(r)) : 0;
+/* lo que se le debe al cliente por una cancelación; sin devolución definida, todo lo cobrado sigue siendo suyo */
+const debeCliente = r => r.estado!=="Cancelada" ? 0 : (devDe(r) ? devPendiente(r)+creditoVivo(r) : cobrado(r));
+/* lo que le queda a la agencia de una cancelación: cobrado − devuelto − penalidades */
+const ganCancel = r => { const d = devDe(r); return d ? cobrado(r) - n0(d.monto) - n0(d.penalidad) : 0; };
+/* devoluciones que ya salieron. El crédito usado también: al usarlo se carga como cobro en la reserva nueva,
+   sin que entre plata, así que acá se compensa para que la caja no lo cuente dos veces. */
+const salioDevolucion = r => { const d = devDe(r); return d && ["Hecha","Usado"].includes(d.estado) ? n0(d.monto) : 0; };
+
+/* Todo lo ganado, con el mes en que se ganó. Viaje: terminado y cobrado completo. Cancelación: al cancelarse. */
+function lineasGanancia(){
+  const L = [];
+  DB.reservas.forEach(r=>{
+    if(r.estado==="Cancelada"){
+      const v = ganCancel(r);
+      if(Math.abs(v)>0.5) L.push({r, mes:mesDe(r.fechaCancel||r.devolucion.fechaDef||r.fechaAlta), monto:v, tipo:"Cancelación"});
+    } else if(realizada(r)) L.push({r, mes:mesDe(fechaReal(r)), monto:ganR(r), tipo:"Viaje"});
+  });
+  return L;
+}
+/* La foto de hoy. Caja = plata inicial + cobros − pagos − gastos − retiros − devoluciones.
+   Se reparte en tres partes que siempre suman la caja:
+   · proveedores: lo que ya cobraste y falta pagarles;
+   · clientes: el margen de viajes que todavía no se hicieron y lo que hay que devolverles;
+   · ganancia: todo lo demás (lo ganado, menos gastos, retiros y adelantos). Es la parte que puede dar negativa. */
+function cuentas(){
+  const R = DB.reservas, vivas = R.filter(r=>r.estado!=="Cancelada"), canc = R.filter(r=>r.estado==="Cancelada");
+  const inicial = DB.cfg.cajaInicial || {};
+  const cobros = sumM(DB.cobros.filter(c=>!c.anulado), c=>c.moneda, c=>c.monto);
+  const pagos = sumM(DB.pagosProv, monPago, p=>p.monto);
+  const gastos = sumM(DB.egresos.filter(esGasto), e=>e.moneda, e=>e.monto);
+  const retiros = sumM(DB.egresos.filter(e=>!esGasto(e)), e=>e.moneda, e=>e.monto);
+  const devoluciones = sumM(canc, monR, salioDevolucion);
+  const caja = sumM(MON_ORD, k=>k, k=>inicial[k]);
+  Object.entries(cobros).forEach(([k,v])=>caja[k] = (caja[k]||0) + v);
+  [pagos,gastos,retiros,devoluciones].forEach(m=>Object.assign(caja, subM(caja, m)));
+  const prov = sumM(vivas, monR, r=>Math.min(Math.max(0, cobrado(r)-pagadoProv(r)), deudaProv(r)));
+  canc.forEach(r=>{ const v = Math.min(Math.max(0, cobrado(r)-pagadoProv(r)-salioDevolucion(r)), penalPorPagar(r)); if(v) prov[r.moneda] = (prov[r.moneda]||0)+v; });
+  const clientes = sumM(vivas.filter(r=>estadoVis(r)!=="Finalizada"), monR, r=>Math.max(0, cobrado(r)-pagadoProv(r)-deudaProv(r)));
+  canc.forEach(r=>{ const v = debeCliente(r); if(v) clientes[r.moneda] = (clientes[r.moneda]||0)+v; });
+  const ganancia = subM(subM(caja, prov), clientes);
+  const conAdelanto = vivas.filter(r=>pagadoProv(r)-cobrado(r)>0.5);
+  return {inicial, cobros, pagos, gastos, retiros, devoluciones, caja, prov, clientes, ganancia, conAdelanto,
+    adelantos: sumM(conAdelanto, monR, r=>pagadoProv(r)-cobrado(r)),
+    deboOps: (()=>{ const m = sumM(vivas, monR, deudaProv); canc.forEach(r=>{ const v = penalPorPagar(r); if(v) m[r.moneda] = (m[r.moneda]||0)+v; }); return m; })(),
+    deboPenal: sumM(canc, monR, penalPorPagar),
+    deboCli: sumM(canc, monR, debeCliente),
+    meDebenCli: sumM(vivas, monR, r=>Math.max(0,saldo(r))),
+    meDebenProv: sumM(canc, monR, aReclamarProv),
+    sinDefinir: canc.filter(r=>!devDe(r) && cobrado(r)>0),
+    otraMoneda: DB.cobros.some(c=>{ const r = byId(R,c.reservaId); return !c.anulado && r && c.moneda!==r.moneda; })};
+}
+
 function estadoPago(r){
   const t = totalVenta(r), c = cobrado(r);
   if(r.estado==="Cancelada"){
@@ -1089,46 +1180,11 @@ VIEWS.panel = function(){
   const enMes = (iso) => mesDe(iso)===panelMes;
   const vendidasMes = R.filter(r=>r.estado!=="Cancelada" && enMes(r.fechaAlta));
   const ventaMes = sumM(vendidasMes, monR, totalVenta);
-  const ganMes = sumM(vendidasMes, monR, ganR);
-  const cobrosMes = DB.cobros.filter(c=>!c.anulado && enMes(c.fecha));
-  const cobradoMes = sumM(cobrosMes, c=>c.moneda, c=>c.monto);
   const porCobrar = sumM(R.filter(r=>r.estado!=="Cancelada"), monR, r=>Math.max(0,saldo(r)));
-  const porPagar = sumM(R.filter(r=>r.estado!=="Cancelada"), monR, deudaProv);
   const salidasSemana = R.filter(r=>r.estado!=="Cancelada" && r.salida>=h && r.salida<=addDays(h,7));
   const segs = DB.leads.filter(l=>leadAbierto(l) && l.proxSeg && l.proxSeg<=h);
   const L = DB.leads, ganados = L.filter(l=>l.etapa==="Reservado").length, perdidos = L.filter(l=>l.etapa==="Perdido").length;
   const conv = ganados+perdidos ? Math.round(ganados/(ganados+perdidos)*100)+"%" : "—";
-  const vivas = R.filter(r=>r.estado!=="Cancelada");
-  const ganReal = sumM(vivas.filter(r=>realizada(r) && mesDe(fechaReal(r))===panelMes), monR, ganR);
-  const ganRealAnio = sumM(vivas.filter(r=>realizada(r) && fechaReal(r).slice(0,4)===panelMes.slice(0,4) && mesDe(fechaReal(r))<=panelMes), monR, ganR);
-  const enCurso = sumM(vivas.filter(r=>!realizada(r) && estadoVis(r)!=="Finalizada" && estadoVis(r)!=="Vencida"), monR, ganR);
-  const finPend = vivas.filter(r=>estadoVis(r)==="Finalizada" && saldo(r)>0.5);
-  /* Plata de clientes que todavía tenés vos: lo cobrado de viajes no realizados menos TODO lo que
-     ya les pagaste a operadores. Si en una reserva adelantaste más de lo cobrado, ese adelanto
-     salió de la plata de otros clientes, así que también resta. */
-  const pendientes = vivas.filter(r=>!realizada(r));
-  /* viajes ya realizados: lo que todavía les debés a operadores sigue siendo plata ajena que tenés */
-  const realizadasConDeuda = vivas.filter(r=>realizada(r) && deudaProv(r)>0.5);
-  const debeRealizadas = r => Math.min(Math.max(0, cobrado(r)-pagadoProv(r)), deudaProv(r));
-  let enPoder = subM(sumM(pendientes, monR, r=>cobrado(r)-pagadoProv(r)), Object.fromEntries(Object.entries(sumM(realizadasConDeuda, monR, debeRealizadas)).map(([k,v])=>[k,-v])));
-  const conAdelanto = pendientes.filter(r=>pagadoProv(r)-cobrado(r) > 0.5);
-  const adelantos = sumM(conAdelanto, monR, r=>pagadoProv(r)-cobrado(r));
-  const egrMes = sumM(DB.egresos.filter(e=>enMes(e.fecha)), e=>e.moneda, e=>e.monto);
-  const paraDevolver = sumM(R, monR, r=>devPendiente(r)+creditoVivo(r));
-  enPoder = subM(enPoder, Object.fromEntries(Object.entries(paraDevolver).map(([k,v])=>[k,-v])));
-  /* de la plata de clientes que tenés, cuánto es para operadores y cuánto es margen anticipado */
-  const paraOps = sumM(pendientes.concat(realizadasConDeuda), monR, r=>Math.min(Math.max(0, cobrado(r)-pagadoProv(r)), deudaProv(r)));
-  const margenAnt = sumM(pendientes, monR, r=>Math.max(0, cobrado(r)-pagadoProv(r)-deudaProv(r)));
-  const monPago = p => (byId(DB.reservas, p.reservaId)||{}).moneda || "ARS";
-  const pagadoMes = sumM(DB.pagosProv.filter(p=>enMes(p.fecha)), monPago, p=>p.monto);
-  /* devoluciones de reservas canceladas: lo pendiente (y los créditos vigentes) es plata de clientes; lo devuelto en el mes es salida de caja */
-  const devolPend = sumM(R, monR, devPendiente), creditos = sumM(R, monR, creditoVivo);
-  const devueltoMes = sumM(R.filter(r=>devDe(r) && devDe(r).estado==="Hecha" && devDe(r).forma!=="Crédito a favor" && enMes(r.devolucion.fechaDev)), monR, r=>r.devolucion.monto);
-  const flujoMes = subM(subM(subM(cobradoMes, pagadoMes), egrMes), devueltoMes);
-  const anio = panelMes.slice(0,4);
-  const egrAnio = sumM(DB.egresos.filter(e=>(e.fecha||"").slice(0,4)===anio && mesDe(e.fecha)<=panelMes), e=>e.moneda, e=>e.monto);
-  const resAnio = subM(ganRealAnio, egrAnio);
-  const resReal = subM(ganReal, egrMes);
   const paxMes = sum(R.filter(r=>r.estado!=="Cancelada" && enMes(r.salida)), paxCount);
 
   const frase = [
@@ -1150,8 +1206,7 @@ VIEWS.panel = function(){
     ${(()=>{ const hoy = cumpleanieros(0); return hoy.length ? `<div class="cumplehoy">🎂 Hoy ${hoy.length===1?"cumple":"cumplen"} años: <b>${hoy.map(x=>esc(x.nombre)+" ("+x.cumple+")").join(", ")}</b>. <a style="cursor:pointer" onclick="document.getElementById('boxCumples').scrollIntoView({behavior:'smooth',block:'center'})">Saludar</a></div>` : ""; })()}
   </div>
 
-  <div class="row" style="margin-bottom:6px"><span class="muted small">Mes a analizar</span>
-    <input type="month" value="${panelMes}" onchange="if(this.value&&this.value.slice(0,4)>='2000'){panelMes=this.value;render()}" style="width:auto"></div>
+  ${panelPlata()}
 
   <div class="kgroup"><div class="kl">Reservas<small>estado actual</small></div><div class="krow boxed">
     ${k(act.length,"Activas",{go:"go('reservas','activas')"})}
@@ -1162,59 +1217,8 @@ VIEWS.panel = function(){
     ${k(cnt("Cancelada"),"Canceladas",{go:"go('reservas','Cancelada')"})}
   </div></div>
 
-  ${(()=>{
-    const neg = m => { const ks = monsM(m); return ks.length ? ks.map(x=>"− "+money(m[x],x)).join("<br>") : money(0); };
-    const pos = m => { const ks = monsM(m); return ks.length ? ks.map(x=>"+ "+money(m[x],x)).join("<br>") : money(0); };
-    /* Resultado del mes: siempre pesos, y dólares (u otra moneda) si la agencia opera en ella; verde si ganó, terracota si perdió. */
-    const monUsadas = MON_ORD.filter(k=>k==="ARS" || DB.reservas.some(r=>r.moneda===k) || DB.egresos.some(e=>e.moneda===k));
-    const resColor = m => monUsadas.map(k=>{ const v = m[k]||0; return `<span class="${v>0.5?"pos":v<-0.5?"negb":"cero"}">${money(v,k)}</span>`; }).join("<br>");
-    const res = m => { const ks = monsM(m); return ks.length ? ks.map(x=>m[x]<0?`<span class="neg">${money(m[x],x)}</span>`:money(m[x],x)).join("<br>") : money(0); };
-    const fila = (lab, val, o={}) => `<div class="pr ${o.cls||""} ${o.go?"click":""}" ${o.go?`onclick="${o.go}"`:""}>
-      <div class="l">${o.op?`<span class="op">${o.op}</span>`:""}${lab}${o.ayuda?`<small>${o.ayuda}</small>`:""}</div><div class="v">${val}</div></div>`;
-    const urg = urgentes().length;
-    return `<div class="plata">
-
-    <section class="pc">
-      <div class="pc-h"><h3>Hoy</h3><span class="tag t-gray">foto del momento</span></div>
-      <div class="q">Cómo estás parado ahora. No depende del mes elegido.</div>
-      ${fila("Te deben los clientes", fmtM(porCobrar), {cls:posM(porCobrar)?"alert":"", ayuda:"Saldos de reservas que todavía no te pagaron."})}
-      ${fila("Les debés a operadores", fmtM(porPagar), {ayuda:"Costos de servicios que todavía no pagaste."})}
-      ${posM(devolPend) ? fila("Devoluciones pendientes a clientes", fmtM(devolPend), {cls:"alert", go:"go('reservas','Cancelada')", ayuda:"Reservas canceladas con plata para devolver."}) : ""}
-      ${posM(creditos) ? fila("Créditos a favor de clientes", fmtM(creditos), {go:"go('reservas','Cancelada')", ayuda:"Plata de cancelaciones que el cliente usa en un próximo viaje."}) : ""}
-      ${fila("Plata de clientes que tenés", fmtM(enPoder), {cls:"big sep", ayuda:"Lo cobrado de viajes que no terminaron (menos lo ya pagado), más lo que todavía debés de viajes terminados. Todavía no es tuya."})}
-      ${fila("Para pagar a operadores", fmtM(paraOps), {cls:"sub", op:"–"})}
-      ${posM(paraDevolver) ? fila("Para devolver a clientes <span class='tiny'>(cancelaciones)</span>", fmtM(paraDevolver), {cls:"sub", op:"–"}) : ""}
-      ${fila("Tu margen anticipado <span class='tiny'>(es tuyo cuando se haga el viaje)</span>", fmtM(margenAnt), {cls:"sub", op:"–"})}
-      ${conAdelanto.length ? fila(`Adelantaste a operadores <span class='tiny'>(${conAdelanto.map(r=>`<a style="cursor:pointer" onclick="event.stopPropagation();go('reserva','${r.id}')">${r.id}</a>`).join(", ")})</span>`, neg(adelantos), {cls:"sub alert", op:"–"}) : ""}
-      ${urg ? `<div class="pc-alert" onclick="go('avisos')">⚠ <span><b>${urg}</b> ${urg===1?"vencimiento atrasado o de hoy":"vencimientos atrasados o de hoy"}</span></div>` : ""}
-      ${finPend.length ? `<div class="pc-alert" onclick="go('avisos')">⚠ <span><b>${finPend.length}</b> ${finPend.length===1?"viaje terminado":"viajes terminados"} con saldo sin cobrar</span></div>` : ""}
-    </section>
-
-    <section class="pc">
-      <div class="pc-h"><h3>Movimiento del mes</h3><span class="tag t-sky">${fmes(panelMes)}</span></div>
-      <div class="q">Qué vendiste y cuánta plata entró y salió.</div>
-      ${fila("Vendiste", fmtM(ventaMes), {ayuda:"Reservas cargadas en el mes, por su precio total."})}
-      ${fila("con una ganancia de", fmtM(ganMes), {cls:"sub", op:"–"})}
-      ${fila("Cobraste a clientes", pos(cobradoMes), {cls:"sep", go:"go('cobros')"})}
-      ${fila("Pagaste a operadores", neg(pagadoMes))}
-      ${fila("Gastos de la agencia", neg(egrMes), {go:"go('egresos')"})}
-      ${posM(devueltoMes) ? fila("Devolviste a clientes", neg(devueltoMes), {go:"go('reservas','Cancelada')"}) : ""}
-      ${fila("Quedó en caja", res(flujoMes), {cls:"tot big", ayuda:"Entró menos salió. Incluye plata de clientes: no es ganancia."})}
-    </section>
-
-    <section class="pc">
-      <div class="pc-h"><h3>Cuánto ganaste</h3><span class="tag t-olive">${fmes(panelMes)}</span></div>
-      <div class="q">Solo cuenta lo ganado de verdad: viajes terminados y cobrados.</div>
-      ${fila("Ganancia de viajes terminados", fmtM(ganReal), {ayuda:"Margen de los viajes que terminaron en el mes y están cobrados completos."})}
-      ${fila("Gastos de la agencia", neg(egrMes), {go:"go('egresos')"})}
-      ${fila("Resultado del mes", resColor(resReal), {cls:"tot big"})}
-      ${fila("Resultado del año <span class='tiny'>(ene–"+MES3[Number(panelMes.slice(5))-1]+")</span>", res(resAnio), {cls:"sep", ayuda:`Ganancia ${fmtM(ganRealAnio," + ")} − gastos ${fmtM(egrAnio," + ")}`})}
-      ${fila("Lo que viene", fmtM(enCurso), {ayuda:"Margen de viajes vendidos que todavía no se hicieron."})}
-    </section>
-    </div>`;
-  })()}
-
   <div class="kgroup"><div class="kl">Comercial<small>${fmes(panelMes)}</small></div><div class="krow boxed">
+    ${k(fmtM(ventaMes),"Vendido en el mes",{sm:true})}
     ${k(vendidasMes.length,"Reservas nuevas")}
     ${k(L.filter(l=>enMes(l.alta)).length,"Leads nuevos")}
     ${k(L.filter(leadAbierto).length,"Leads abiertos",{go:"go('leads')"})}
@@ -1238,6 +1242,108 @@ VIEWS.panel = function(){
     ${boxEgresos()}
   </div>`;
 };
+
+/* La plata, en el orden en que se la pregunta uno: cuánto gano, cuánto gasto, cuánto debo, cuánto me deben y qué hay en la caja. */
+const COL_PROV = "#1F6FA8", COL_CLI = "#D39A2D", COL_GAN = "#2E7D3A";
+function panelPlata(){
+  const C = cuentas(), lin = lineasGanancia();
+  const ganadoEn = m => sumM(lin.filter(g=>g.mes===m), g=>g.r.moneda, g=>g.monto);
+  const gastadoEn = m => sumM(DB.egresos.filter(e=>esGasto(e) && mesDe(e.fecha)===m), e=>e.moneda, e=>e.monto);
+  const gan = ganadoEn(panelMes), gas = gastadoEn(panelMes), res = subM(gan, gas);
+  const anio = panelMes.slice(0,4);
+  const delAnio = m => m.slice(0,4)===anio && m<=panelMes;
+  const ganAnio = sumM(lin.filter(g=>delAnio(g.mes)), g=>g.r.moneda, g=>g.monto);
+  const gasAnio = sumM(DB.egresos.filter(e=>esGasto(e) && delAnio(mesDe(e.fecha))), e=>e.moneda, e=>e.monto);
+  const meses = [panelMes]; while(meses.length<6) meses.unshift(mesAnterior(meses[0]));
+
+  const resVal = m => { const ks = monsM(m); return ks.length ? ks.map(x=>`<span class="${m[x]>0?"res-pos":"res-neg"}">${money(m[x],x)}</span>`).join("<br>") : `<span class="res-cero">${money(0)}</span>`; };
+  const cel = m => monsM(m).length ? fmtM(m) : `<span class="muted">—</span>`;
+  const celRes = m => monsM(m).length ? monsM(m).map(x=>`<span class="${m[x]<0?"res-neg":""}">${money(m[x],x)}</span>`).join("<br>") : `<span class="muted">—</span>`;
+  const delMes = lin.filter(g=>g.mes===panelMes).sort((a,b)=>a.r.id.localeCompare(b.r.id));
+
+  const sub = (lab, val, o={}) => `<div class="din-sub ${o.go?"click":""}" ${o.go?`onclick="${o.go}"`:""}><div class="l">${lab}${o.ayuda?`<small>${o.ayuda}</small>`:""}</div><div class="v">${val}</div></div>`;
+  const urg = urgentes().length;
+  const finPend = DB.reservas.filter(r=>estadoVis(r)==="Finalizada" && saldo(r)>0.5);
+  const debo = (()=>{ const m = Object.assign({}, C.deboOps); Object.entries(C.deboCli).forEach(([k,v])=>m[k]=(m[k]||0)+v); return m; })();
+  const meDeben = (()=>{ const m = Object.assign({}, C.meDebenCli); Object.entries(C.meDebenProv).forEach(([k,v])=>m[k]=(m[k]||0)+v); return m; })();
+
+  /* caja: una columna por moneda */
+  const mons = MON_ORD.filter(x=>[C.caja,C.prov,C.clientes,C.ganancia].some(m=>Math.abs(m[x]||0)>0.5));
+  if(!mons.length) mons.push("ARS");
+  const partes = [["Para proveedores",C.prov,COL_PROV,"Ya lo cobraste y falta pagarlo."],
+    ["De clientes",C.clientes,COL_CLI,"Margen de viajes que todavía no se hicieron, más devoluciones. Si el viaje se cae, vuelve."],
+    ["Ganancia",C.ganancia,COL_GAN,"Lo ganado, menos gastos y retiros. Es la parte que es tuya."]];
+  const barra = x => { const ps = partes.map(p=>[p,Math.max(0,p[1][x]||0)]).filter(([,v])=>v>0.5), t = ps.reduce((a,[,v])=>a+v,0);
+    if(!t) return "";
+    return `${mons.length>1?`<div class="cbar-m">${SIM[x]||x}</div>`:""}<div class="cbar" role="img" aria-label="Reparto de la caja en ${x}: ${ps.map(([p,v])=>p[0]+" "+Math.round(v/t*100)+"%").join(", ")}">${ps.map(([p,v])=>`<i style="flex:${v} 1 0;background:${p[2]}" title="${p[0]}: ${money(v,x)} (${Math.round(v/t*100)}%)"></i>`).join("")}</div>`; };
+  const celdaCaja = (m,x) => { const v = m[x]||0; return `<div class="v ${v<-0.5?"res-neg":""}">${money(v,x)}</div>`; };
+  const linea = (lab, m, signo) => monsM(m).length ? `<div><span>${lab}</span><b>${monsM(m).map(x=>(signo||"")+money(m[x],x)).join(" · ")}</b></div>` : "";
+  const entroMes = sumM(DB.cobros.filter(c=>!c.anulado && mesDe(c.fecha)===panelMes), c=>c.moneda, c=>c.monto);
+  const salioMes = (()=>{ const m = sumM(DB.pagosProv.filter(p=>mesDe(p.fecha)===panelMes), monPago, p=>p.monto);
+    DB.egresos.filter(e=>mesDe(e.fecha)===panelMes).forEach(e=>m[e.moneda||"ARS"] = (m[e.moneda||"ARS"]||0)+n0(e.monto));
+    DB.reservas.forEach(r=>{ const dv = devDe(r); if(salioDevolucion(r) && mesDe(dv.fechaDev)===panelMes) m[r.moneda] = (m[r.moneda]||0)+salioDevolucion(r); });
+    return m; })();
+
+  return `<div class="din">
+    <div class="din-h"><h2>Cuánto gano</h2>
+      <div class="din-nav"><button class="btn ghost sm" aria-label="Mes anterior" onclick="panelMes=mesAnterior(panelMes);render()">‹</button>
+        <input type="month" aria-label="Mes" value="${panelMes}" onchange="if(this.value&&this.value.slice(0,4)>='2000'){panelMes=this.value;render()}">
+        <button class="btn ghost sm" aria-label="Mes siguiente" onclick="panelMes=mesSiguiente(panelMes);render()">›</button></div></div>
+    <div class="din-card din-mes">
+      <div>
+        <div class="eq">
+          <div><div class="lb">Gané en ${MESES[Number(panelMes.slice(5))-1]}</div><div class="val">${fmtM(gan)}</div><small>Viajes terminados y cobrados, y lo que quedó de cancelaciones.</small></div>
+          <div class="op" aria-hidden="true">−</div>
+          <div><div class="lb click" onclick="egrMes=panelMes;go('egresos')">Gasté</div><div class="val">${fmtM(gas)}</div><small>Gastos de la agencia. El costo de cada viaje ya está descontado.</small></div>
+          <div class="op" aria-hidden="true">=</div>
+          <div><div class="lb">Me quedó</div><div class="val">${resVal(res)}</div></div>
+        </div>
+        <details><summary>Ver de qué viajes sale</summary><div class="din-lista">${delMes.length ? delMes.map(g=>`<div class="click" onclick="go('reserva','${g.r.id}')"><span>${g.r.id} · ${esc(tituloRes(g.r))}${g.tipo==="Cancelación"?" (cancelación)":""}</span><b>${money(g.monto,g.r.moneda)}</b></div>`).join("") : `<div><span class="muted">Ningún viaje terminó y quedó cobrado en este mes.</span></div>`}</div></details>
+      </div>
+      <div class="tw"><table class="din-meses"><thead><tr><th>Mes</th><th>Gané</th><th>Gasté</th><th>Me quedó</th></tr></thead><tbody>
+        ${meses.map(m=>`<tr class="${m===panelMes?"cur":""}" onclick="panelMes='${m}';render()"><td>${MES3[Number(m.slice(5))-1]}</td><td>${cel(ganadoEn(m))}</td><td>${cel(gastadoEn(m))}</td><td>${celRes(subM(ganadoEn(m),gastadoEn(m)))}</td></tr>`).join("")}
+      </tbody><tfoot><tr><td>${anio}</td><td>${cel(ganAnio)}</td><td>${cel(gasAnio)}</td><td>${celRes(subM(ganAnio,gasAnio))}</td></tr></tfoot></table></div>
+    </div>
+
+    <div class="din-h"><h2>Cómo estoy hoy</h2></div>
+    <div class="din-hoy">
+      <section class="din-card"><h3>Debo</h3><div class="din-big">${fmtM(debo)}</div>
+        ${sub("A operadores", fmtM(C.deboOps), {go:"pgModo='pendiente';go('pagos')", ayuda:[posM(C.prov)?`Para esto ya tenés ${fmtM(C.prov," y ")} en caja.`:"", posM(C.deboPenal)?`Incluye ${fmtM(C.deboPenal," y ")} de penalidades de cancelaciones.`:""].filter(Boolean).join(" ")})}
+        ${posM(C.deboCli) ? sub("A clientes", fmtM(C.deboCli), {go:"go('reservas','Cancelada')", ayuda:"Devoluciones y créditos de cancelaciones."}) : ""}
+        ${urg ? `<div class="pc-alert" onclick="go('avisos')">⚠ <span><b>${urg}</b> ${urg===1?"vencimiento atrasado o de hoy":"vencimientos atrasados o de hoy"}</span></div>` : ""}
+        ${C.sinDefinir.length ? `<div class="pc-alert" onclick="go('reservas','Cancelada')">⚠ <span><b>${C.sinDefinir.length}</b> ${C.sinDefinir.length===1?"cancelación":"cancelaciones"} sin definir cuánto se devuelve</span></div>` : ""}
+      </section>
+
+      <section class="din-card"><h3>Me deben</h3><div class="din-big">${fmtM(meDeben)}</div>
+        ${sub("Clientes", fmtM(C.meDebenCli), {go:"go('avisos')", ayuda:"Saldos de reservas."})}
+        ${posM(C.meDebenProv) ? sub("Proveedores", fmtM(C.meDebenProv), {go:"go('reservas','Cancelada')", ayuda:"Lo que les pagaste de reservas canceladas y te tienen que devolver."}) : ""}
+        ${finPend.length ? `<div class="pc-alert" onclick="go('avisos')">⚠ <span><b>${finPend.length}</b> ${finPend.length===1?"viaje terminado":"viajes terminados"} con saldo sin cobrar</span></div>` : ""}
+      </section>
+
+      <section class="din-card">
+        <div class="caja" style="--n:${mons.length};grid-template-columns:minmax(0,1fr) repeat(${mons.length},auto)">
+          <div class="tope">Tengo en caja</div>${mons.map(x=>`<div class="tope v ${(C.caja[x]||0)<-0.5?"res-neg":""}">${money(C.caja[x]||0,x)}</div>`).join("")}
+          ${mons.map(barra).join("")}
+          ${partes.map(p=>`<div class="fila"><div><span class="sw" style="background:${p[2]}"></span>${p[0]}<small>${p[3]}</small></div>${mons.map(x=>celdaCaja(p[1],x)).join("")}</div>`).join("")}
+        </div>
+        ${negM(C.caja) ? `<div class="pc-alert" onclick="go('config')">⚠ <span>La caja da negativa: falta cargar en Configuración la plata con la que arrancó o lo que pusieron los socios.</span></div>`
+          : sum(Object.entries(C.ganancia), ([x,v])=>toARS(v,x))<-0.5 ? `<div class="pc-alert fijo">⚠ <span>Salió más de lo ganado: esa diferencia se pagó con plata de clientes o de proveedores.</span></div>` : ""}
+        ${C.conAdelanto.length ? `<div class="pc-alert fijo">⚠ <span>Adelantaste ${fmtM(C.adelantos," y ")} a operadores en ${C.conAdelanto.map(r=>`<a style="cursor:pointer" onclick="go('reserva','${r.id}')">${r.id}</a>`).join(", ")}: pagaste más de lo que cobraste.</span></div>` : ""}
+        ${C.otraMoneda ? `<div class="tiny" style="margin-top:8px">Hay cobros en una moneda distinta a la de su reserva, como un viaje en dólares pagado en pesos. La caja los suma en la moneda en que entraron y el reparto los cuenta en la de la reserva, así que una columna puede dar de más y la otra de menos.</div>` : ""}
+        <details><summary>Ver cómo se llega a este número</summary><div class="din-lista">
+          ${linea("Plata inicial", sumM(MON_ORD, x=>x, x=>C.inicial[x]))}
+          ${linea("Cobraste a clientes", C.cobros, "+ ")}
+          ${linea("Pagaste a operadores", C.pagos, "− ")}
+          ${linea("Gastos de la agencia", C.gastos, "− ")}
+          ${linea("Retiros de socios", C.retiros, "− ")}
+          ${linea("Devoluciones a clientes", C.devoluciones, "− ")}
+          <div class="tot"><span>En caja</span><b>${mons.map(x=>money(C.caja[x]||0,x)).join(" · ")}</b></div>
+          <div class="tiny" style="display:block;padding-top:8px">En ${fmes(panelMes)} entró ${fmtM(entroMes," y ")} y salió ${fmtM(salioMes," y ")}.</div>
+        </div></details>
+      </section>
+    </div>
+  </div>`;
+}
 
 let chartMon = "ARS";
 function boxVentas12(){
@@ -1328,7 +1434,7 @@ function boxLegajos(){
 }
 
 function boxEgresos(){
-  const L = DB.egresos.filter(e=>mesDe(e.fecha)===panelMes);
+  const L = DB.egresos.filter(e=>esGasto(e) && mesDe(e.fecha)===panelMes);
   const data = contar(L, e=>e.categoria).map(([c])=>{ const xs = L.filter(e=>e.categoria===c); return [c, sum(xs, e=>toARS(e.monto,e.moneda)), sumM(xs, e=>e.moneda, e=>e.monto)]; }).sort((a,b)=>b[1]-a[1]);
   const max = Math.max(...data.map(x=>x[1]),1);
   return `<div class="box"><h2>Egresos por categoría · ${fmes(panelMes)}</h2>${data.length?`<div class="hb">${data.slice(0,7).map(([n,v,m])=>`
@@ -2038,7 +2144,7 @@ function dvForm(r){
       ${pp>0.5?`<span class="muted">·</span><span>Ya pagaste a proveedores ${money(pp,r.moneda)}: averiguá cuánto te devuelven.</span>`:""}</div></div>
     <div class="grid g2">
       <label class="f"><span>Penalidades de prestadores (${r.moneda})</span><input id="dvPen" type="number" step="any" min="0" value="${dv.penalidad}" oninput="dv.penalidad=this.value;dvCalc()">
-        <span class="hint">Lo que los proveedores retienen o cobran por la cancelación.</span></label>
+        <span class="hint">Lo que los proveedores se quedan por la cancelación. Si ya les pagaste más que esto, la diferencia queda como plata a reclamarles.</span></label>
       <label class="f"><span>Cargo de gestión (${r.moneda})</span><input id="dvGes" type="number" step="any" min="0" value="${dv.gestion}" oninput="dv.gestion=this.value;dvCalc()">
         <span class="hint">${g10>0?`<a style="cursor:pointer" onclick="dv.gestion=${g10};$('dvGes').value=${g10};dvCalc()">Usar 10% del total (${money(g10,r.moneda)})</a>`:"Según la política de cancelación."}</span></label>
       <label class="f req"><span>Monto a devolver (${r.moneda})</span><input id="dvMonto" type="number" step="any" min="0" value="${dv.monto}" oninput="dv.monto=this.value;dv._manual=1">
@@ -2150,7 +2256,7 @@ function devBoxHTML(r){
         ${d.penalidad?`<dt>Penalidades</dt><dd>− ${m(d.penalidad)}</dd>`:""}
         ${d.gestion?`<dt>Cargo de gestión</dt><dd>− ${m(d.gestion)}</dd>`:""}
         <dt><b>${cred?"Crédito a favor":"A devolver"}</b></dt><dd><b>${m(d.monto)}</b> ${est}</dd>
-        ${cob-n0(d.monto)>0.5?`<dt>Queda en la agencia</dt><dd>${m(cob-n0(d.monto))}</dd>`:""}
+        ${Math.abs(ganCancel(r))>0.5?`<dt>Te queda de ganancia</dt><dd>${m(ganCancel(r))}</dd>`:""}
         ${d.nota?`<dt>Nota</dt><dd>${esc(d.nota)}</dd>`:""}
         ${d.notaDev?`<dt>${cred?"Uso":"Comprobante"}</dt><dd>${esc(d.notaDev)}</dd>`:""}
       </dl>
@@ -2160,7 +2266,34 @@ function devBoxHTML(r){
         ${!cero ? `<button class="btn ghost sm" onclick="copiarDevolucion('${r.id}')">Copiar para WhatsApp</button>` : ""}
       </div>`;
   }
-  return `<div class="box" style="border-color:var(--wineS);background:#F3E6DF;margin-bottom:16px">${enc}${cuerpo}</div>`;
+  const recl = aReclamarProv(r), pen = penalPorPagar(r);
+  const prov = (recl>0.5 || pen>0.5) ? `<div class="row" style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--wineS)">
+      ${recl>0.5 ? `<span class="small">Los proveedores te tienen que devolver <b>${m(recl)}</b></span><button class="btn sec sm" onclick="formProvCancel('${r.id}','reintegro')">Registrar lo que devolvieron</button>` : ""}
+      ${pen>0.5 ? `<span class="small">Falta pagar de penalidades <b>${m(pen)}</b></span><button class="btn sec sm" onclick="formProvCancel('${r.id}','penalidad')">Registrar pago</button>` : ""}
+    </div>` : "";
+  return `<div class="box" style="border-color:var(--wineS);background:#F3E6DF;margin-bottom:16px">${enc}${cuerpo}${prov}</div>`;
+}
+/* Plata con proveedores de una reserva cancelada. Lo que devuelven se guarda como un pago negativo, sin servicio. */
+function formProvCancel(id, tipo){
+  const r = byId(DB.reservas,id), rein = tipo==="reintegro", tope = rein ? aReclamarProv(r) : penalPorPagar(r);
+  const provs = [...new Set((r.servicios||[]).map(s=>s.operadorId||s.proveedorId).filter(Boolean))];
+  openModal(`<div class="modal-h"><h2>${rein?"Devolución del proveedor":"Pago de penalidad"}</h2><button class="x" onclick="closeModal()">×</button></div>
+    <div class="modal-b"><p class="small" style="margin-top:0">${r.id} · ${esc(nombreCliente(r.clienteId))} · ${rein?"te tienen que devolver":"falta pagar"} <b>${money(tope,r.moneda)}</b></p>
+    <div class="grid g2">
+      ${provs.length?`<label class="f spanall"><span>Proveedor</span><select id="pcProv">${opts(provs.map(p=>({v:p,t:nombreProv(p)})), provs[0])}</select></label>`:""}
+      <label class="f req"><span>Importe (${r.moneda})</span><input id="pcMonto" type="number" step="any" min="0" value="${Math.round(tope*100)/100}"></label>
+      <label class="f"><span>Fecha</span><input id="pcFecha" type="date" value="${today()}"></label>
+      <label class="f"><span>Medio</span><select id="pcMedio">${opts(DB.cfg.medios, "Transferencia")}</select></label>
+      <label class="f"><span>Comprobante o nota</span><input id="pcNota" placeholder="N.º de transferencia, factura…"></label>
+    </div></div>
+    <div class="modal-f"><button class="btn sec" onclick="closeModal()">Cancelar</button><button class="btn" onclick="guardarProvCancel('${id}','${tipo}')">Registrar</button></div>`);
+}
+function guardarProvCancel(id, tipo){
+  const m = n0($("pcMonto").value), rein = tipo==="reintegro";
+  if(!(m>0)) return toast("Cargá el importe.");
+  DB.pagosProv.push({id:nuevoId("PAG"), reservaId:id, servicioId:"", proveedorId:$("pcProv")?.value||"", fecha:$("pcFecha").value||today(), monto:rein?-m:m, medio:$("pcMedio").value,
+    nota:$("pcNota").value.trim() || (rein?"Devolución del proveedor por cancelación":"Penalidad por cancelación")});
+  save(); closeModal(); render(); toast(rein?"Devolución del proveedor registrada.":"Pago de penalidad registrado.");
 }
 
 function copiarResumen(id){
@@ -3089,6 +3222,8 @@ VIEWS.config = function(){
   <div class="box"><h2>Tipos de cambio</h2><p class="small muted" style="margin-top:-6px">Se usan solo para convertir un cobro cuando el cliente paga en una moneda distinta a la de la reserva. El panel muestra cada moneda por separado.</p><div class="grid g4">
     <label class="f"><span>1 US$ en pesos</span><input type="number" value="${g.tc.USD}" oninput="DB.cfg.tc.USD=Number(this.value)||0;save()"></label>
     <label class="f"><span>1 R$ en pesos</span><input type="number" value="${g.tc.BRL}" oninput="DB.cfg.tc.BRL=Number(this.value)||0;save()"></label></div></div>
+  <div class="box"><h2>Plata inicial de la caja</h2><p class="small muted" style="margin-top:-6px">La plata que ya había antes de cargar movimientos en el CRM, más lo que pusieron los socios de su bolsillo. Sin esto la caja arranca en cero y puede dar negativa. Para mirar si coincide con lo que tenés en el banco y en efectivo, abrí el detalle de la caja en el panel.</p><div class="grid g4">
+    ${MON_ORD.map(m=>`<label class="f"><span>En ${({ARS:"pesos",USD:"dólares",BRL:"reales"})[m]}</span><input type="number" step="any" value="${n0(g.cajaInicial[m])||""}" placeholder="0" oninput="DB.cfg.cajaInicial['${m}']=Number(this.value)||0;save()"></label>`).join("")}</div></div>
   <div class="dgrid" style="margin-top:16px">${lista("medios","Medios de pago")}${lista("canales","Canales de ingreso")}${lista("localidades","Localidades")}${lista("tiposProv","Tipos de proveedor")}${lista("catEgresos","Categorías de egresos")}${lista("segmentos","Perfiles de cliente")}${lista("intereses","Intereses")}${lista("viajaCon","Con quién viaja")}${lista("temporadas","Cuándo prefiere viajar")}${lista("presupuestos","Presupuestos")}${lista("feriados","Feriados y días no laborables (AAAA-MM-DD Nombre)")}</div>
   <div class="box" style="margin-top:16px"><h2>Avisos de vencimientos</h2>
     <div class="grid g4"><label class="f"><span>Avisar con anticipación (días)</span><input type="number" min="1" max="60" value="${g.avisoDias}" oninput="DB.cfg.avisoDias=Math.max(1,Number(this.value)||7);save()" onchange="renderSide()"></label>
@@ -3183,18 +3318,20 @@ function borrarTodo(){
 /* ═════════════ EGRESOS ═════════════ */
 let egrMes = mesDe(today()), egrCat = "";
 const mesAnterior = ym => { const d = new Date(ym+"-15T12:00:00"); d.setMonth(d.getMonth()-1); return d.getFullYear()+"-"+pad(d.getMonth()+1); };
+const mesSiguiente = ym => { const d = new Date(ym+"-15T12:00:00"); d.setMonth(d.getMonth()+1); return d.getFullYear()+"-"+pad(d.getMonth()+1); };
 VIEWS.egresos = function(){
   const delMes = DB.egresos.filter(e=>!egrMes || mesDe(e.fecha)===egrMes);
   const L = sortBy(delMes.filter(e=>!egrCat || e.categoria===egrCat), e=>e.fecha+e.id).reverse();
   const eM = arr => sumM(arr, e=>e.moneda, e=>e.monto);
-  const tot = eM(delMes), fijos = eM(delMes.filter(e=>e.tipoGasto==="Fijo"));
+  const gastosMes = delMes.filter(esGasto), retirosMes = eM(delMes.filter(e=>!esGasto(e)));
+  const tot = eM(gastosMes), fijos = eM(gastosMes.filter(e=>e.tipoGasto==="Fijo"));
   /* variación: solo en pesos (los egresos en otra moneda no se comparan) */
-  const totP = n0(tot.ARS), prev = egrMes ? n0(eM(DB.egresos.filter(e=>mesDe(e.fecha)===mesAnterior(egrMes))).ARS) : 0;
+  const totP = n0(tot.ARS), prev = egrMes ? n0(eM(DB.egresos.filter(e=>esGasto(e) && mesDe(e.fecha)===mesAnterior(egrMes))).ARS) : 0;
   const var_ = prev ? Math.round((totP-prev)/prev*100) : null;
-  const cats = contar(delMes, e=>e.categoria).map(([c])=>{ const xs = delMes.filter(e=>e.categoria===c); return [c, sum(xs, e=>toARS(e.monto,e.moneda)), eM(xs)]; }).sort((a,b)=>b[1]-a[1]);
+  const cats = contar(gastosMes, e=>e.categoria).map(([c])=>{ const xs = gastosMes.filter(e=>e.categoria===c); return [c, sum(xs, e=>toARS(e.monto,e.moneda)), eM(xs)]; }).sort((a,b)=>b[1]-a[1]);
   const hayFijosPrev = egrMes && DB.egresos.some(f=>f.tipoGasto==="Fijo" && mesDe(f.fecha)===mesAnterior(egrMes) &&
     !DB.egresos.some(e=>mesDe(e.fecha)===egrMes && e.descripcion===f.descripcion && e.categoria===f.categoria));
-  return head("Egresos", "Gastos de funcionamiento de la agencia. Lo que pagás a proveedores por cada viaje se registra dentro de la reserva, no acá.",
+  return head("Egresos", `Gastos de funcionamiento de la agencia. Lo que pagás a proveedores por cada viaje se registra dentro de la reserva, no acá. Si un socio se lleva plata, cargalo con la categoría «${CAT_RETIRO}»: baja la caja, pero no cuenta como gasto.`,
       `${hayFijosPrev?`<button class="btn sec" onclick="repetirFijos()">Repetir fijos de ${fmes(mesAnterior(egrMes))}</button>`:""}<button class="btn" onclick="editar('egresos')">Nuevo egreso</button>`) +
     `<div class="row" style="margin-bottom:14px"><span class="small muted">Mes</span>
       <input type="month" value="${egrMes}" style="width:auto" onchange="if(this.value&&this.value.slice(0,4)>='2000'){egrMes=this.value;render()}">
@@ -3205,15 +3342,17 @@ VIEWS.egresos = function(){
         <div class="k"><div class="v sm">${fmtM(tot)}</div><div class="lb">Total ${egrMes?fmes(egrMes):"histórico"}</div></div>
         <div class="k"><div class="v sm">${fmtM(fijos)}</div><div class="lb">Fijos</div></div>
         <div class="k"><div class="v sm">${fmtM(subM(tot,fijos))}</div><div class="lb">Variables</div></div>
+        ${posM(retirosMes)?`<div class="k"><div class="v sm">${fmtM(retirosMes)}</div><div class="lb">Retiros de socios (no son gasto)</div></div>`:""}
         ${var_!==null?`<div class="k ${var_>0?"alert":""}"><div class="v sm">${var_>0?"+":""}${var_}%</div><div class="lb">contra ${fmes(mesAnterior(egrMes))}${monsM(tot).length>1?" (en pesos)":""}</div></div>`:""}
       </div></div>
-      <div class="box"><div class="hb">${cats.slice(0,6).map(([n,v,m])=>`<span>${esc(n)}</span><div class="tr"><i style="width:${v/(cats[0][1]||1)*100}%;background:var(--ocre)"></i></div><span class="small">${fmtM(m," + ")}</span>`).join("")}</div></div>
+      ${cats.length?`<div class="box"><div class="hb">${cats.slice(0,6).map(([n,v,m])=>`<span>${esc(n)}</span><div class="tr"><i style="width:${v/(cats[0][1]||1)*100}%;background:var(--ocre)"></i></div><span class="small">${fmtM(m," + ")}</span>`).join("")}</div></div>`:""}
     </div>`:""}
     ${L.length?`<div class="box flat"><div class="tw"><table><thead><tr><th>Fecha</th><th>Categoría</th><th>Descripción</th><th>Tipo</th><th>Medio</th><th>Comprobante</th><th class="num">Monto</th></tr></thead><tbody>
       ${L.map(e=>`<tr class="click" onclick="editar('egresos','${e.id}')"><td>${fdate(e.fecha)}</td><td>${esc(e.categoria)}</td><td>${esc(e.descripcion)}</td>
         <td><span class="tag ${e.tipoGasto==="Fijo"?"t-ocre":"t-gray"}">${esc(e.tipoGasto)}</span></td><td>${esc(e.medio)}</td><td class="small">${esc(e.comprobante)}</td>
         <td class="num">${money(e.monto,e.moneda)}</td></tr>`).join("")}</tbody>
-      <tfoot><tr><td colspan="6">Total</td><td class="num">${fmtM(sumM(L,e=>e.moneda,e=>e.monto))}</td></tr></tfoot></table></div></div>`
+      <tfoot><tr><td colspan="6">Total de gastos</td><td class="num">${fmtM(sumM(L.filter(esGasto),e=>e.moneda,e=>e.monto))}</td></tr>
+        ${L.some(e=>!esGasto(e))?`<tr><td colspan="6">Retiros de socios (no son gasto)</td><td class="num">${fmtM(sumM(L.filter(e=>!esGasto(e)),e=>e.moneda,e=>e.monto))}</td></tr>`:""}</tfoot></table></div></div>`
     :`<div class="box empty"><b>Sin egresos${egrMes?" en "+fmes(egrMes):""}</b>Cargá alquiler, servicios, publicidad, contador… Marcá como fijos los que se repiten y el mes siguiente los copiás con un botón.</div>`}`;
 };
 function repetirFijos(){
