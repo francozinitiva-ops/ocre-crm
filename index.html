@@ -494,7 +494,7 @@ const CFG_DEF = {
   medios:["Efectivo","Transferencia","Mercado Pago","Tarjeta de débito","Tarjeta de crédito","Depósito","Otro"],
   canales:["WhatsApp","Referido","Instagram","Facebook","Web","Llamada","Presencial","Otro"],
   localidades:["Albardón","Capital","Rawson","Rivadavia","Chimbas","Santa Lucía","Pocito","Caucete","Zonda","Ullum","9 de Julio","San Martín","Angaco","25 de Mayo","Sarmiento","Jáchal","Iglesia","Calingasta","Valle Fértil","Otra provincia"],
-  catEgresos:["Alquiler","Servicios (luz, internet, teléfono)","Marketing y publicidad","Software y suscripciones","Impuestos y tasas","Contador","Comisiones bancarias","Sueldos y honorarios","Movilidad","Insumos de oficina","Varios","Retiro de socios"],
+  catEgresos:["Alquiler","Servicios (luz, internet, teléfono)","Marketing y publicidad","Software y suscripciones","Impuestos y tasas","Contador","Comisiones bancarias","Costo de tarjetas","Sueldos y honorarios","Movilidad","Insumos de oficina","Varios","Retiro de socios"],
   cajaInicial:{ARS:0, USD:0, BRL:0},
   ciudad:"San Juan",
   segmentos:["Turista urbano","Curioso del paisaje y el cosmos","Pareja / escapada","Familia","Grupo / jubilados","Corporativo"],
@@ -556,6 +556,7 @@ function merge(p){
   DB.cfg.tc = Object.assign(clone(CFG_DEF.tc), (p.cfg||{}).tc||{});
   DB.cfg.cajaInicial = Object.assign(clone(CFG_DEF.cajaInicial), (p.cfg||{}).cajaInicial||{});
   if(!DB.cfg.catEgresos.includes(CAT_RETIRO)) DB.cfg.catEgresos.push(CAT_RETIRO);
+  if(!DB.cfg.catEgresos.includes(CAT_TARJETA)) DB.cfg.catEgresos.splice(Math.max(0, DB.cfg.catEgresos.indexOf(CAT_RETIRO)), 0, CAT_TARJETA);
   DB.cont = Object.assign(clone(BLANK.cont), p.cont||{});
   DB.reservas.forEach(migrarReserva);
   DB.leads.forEach(l=>{ if(l.etapa==="Ganado") l.etapa = "Reservado"; });
@@ -859,6 +860,13 @@ const creditoVivo = r => { const d = devDe(r); return d && d.forma==="Crédito a
    la diferencia; si le pagaste más, te la tiene que devolver (se registra como un pago negativo). */
 const CAT_RETIRO = "Retiro de socios";
 const esGasto = e => e.categoria !== CAT_RETIRO;
+/* Recargo por pagar con tarjeta: el cliente paga más, pero solo el importe sin recargo baja el saldo de la reserva.
+   El recargo es un ingreso de la agencia y lo que descuenta la tarjeta (comisión + cuotas) es un gasto, con categoría propia.
+   Así la caja sube por lo que realmente queda y la ganancia por la diferencia entre los dos. */
+const CAT_TARJETA = "Costo de tarjetas";
+const esMedioTarjeta = m => /tarjeta|cr[eé]dito|mercado ?pago|posnet|cuota/i.test(m||"");
+const recargoDe = c => n0(c.recargo);
+const egresoTarjeta = c => c.egresoId ? byId(DB.egresos, c.egresoId) : null;
 const monPago = p => (byId(DB.reservas,p.reservaId)||{}).moneda || "ARS";
 const penalidadDe = r => n0((devDe(r)||{}).penalidad);
 const penalPorPagar = r => r.estado==="Cancelada" ? Math.max(0, penalidadDe(r) - pagadoProv(r)) : 0;
@@ -871,7 +879,9 @@ const ganCancel = r => { const d = devDe(r); return d ? cobrado(r) - n0(d.monto)
    sin que entre plata, así que acá se compensa para que la caja no lo cuente dos veces. */
 const salioDevolucion = r => { const d = devDe(r); return d && ["Hecha","Usado"].includes(d.estado) ? n0(d.monto) : 0; };
 
-/* Todo lo ganado, con el mes en que se ganó. Viaje: terminado y cobrado completo. Cancelación: al cancelarse. */
+/* Todo lo ganado, con el mes en que se ganó. Viaje: terminado y cobrado completo. Cancelación: al cancelarse.
+   Recargo por tarjeta: el día del cobro. Cada línea trae su moneda (monG). */
+const monG = g => g.moneda || g.r.moneda;
 function lineasGanancia(){
   const L = [];
   DB.reservas.forEach(r=>{
@@ -880,6 +890,9 @@ function lineasGanancia(){
       if(Math.abs(v)>0.5) L.push({r, mes:mesDe(r.fechaCancel||r.devolucion.fechaDef||r.fechaAlta), monto:v, tipo:"Cancelación"});
     } else if(realizada(r)) L.push({r, mes:mesDe(fechaReal(r)), monto:ganR(r), tipo:"Viaje"});
   });
+  /* recargos por tarjeta: se ganan el día del cobro (lo que se lleva la tarjeta va a Egresos) */
+  DB.cobros.filter(c=>!c.anulado && recargoDe(c)>0).forEach(c=>{ const r = byId(DB.reservas,c.reservaId);
+    if(r) L.push({r, c, mes:mesDe(c.fecha), monto:recargoDe(c), moneda:c.moneda, tipo:"Recargo"}); });
   return L;
 }
 /* La foto de hoy. Caja = plata inicial + cobros − pagos − gastos − retiros − devoluciones.
@@ -1248,12 +1261,12 @@ VIEWS.panel = function(){
 const COL_PROV = "#1F6FA8", COL_CLI = "#D39A2D", COL_GAN = "#2E7D3A";
 function panelPlata(){
   const C = cuentas(), lin = lineasGanancia();
-  const ganadoEn = m => sumM(lin.filter(g=>g.mes===m), g=>g.r.moneda, g=>g.monto);
+  const ganadoEn = m => sumM(lin.filter(g=>g.mes===m), monG, g=>g.monto);
   const gastadoEn = m => sumM(DB.egresos.filter(e=>esGasto(e) && mesDe(e.fecha)===m), e=>e.moneda, e=>e.monto);
   const gan = ganadoEn(panelMes), gas = gastadoEn(panelMes), res = subM(gan, gas);
   const anio = panelMes.slice(0,4);
   const delAnio = m => m.slice(0,4)===anio && m<=panelMes;
-  const ganAnio = sumM(lin.filter(g=>delAnio(g.mes)), g=>g.r.moneda, g=>g.monto);
+  const ganAnio = sumM(lin.filter(g=>delAnio(g.mes)), monG, g=>g.monto);
   const gasAnio = sumM(DB.egresos.filter(e=>esGasto(e) && delAnio(mesDe(e.fecha))), e=>e.moneda, e=>e.monto);
   const meses = [panelMes]; while(meses.length<6) meses.unshift(mesAnterior(meses[0]));
 
@@ -1294,13 +1307,13 @@ function panelPlata(){
     <div class="din-card din-mes">
       <div>
         <div class="eq">
-          <div><div class="lb">Gané en ${MESES[Number(panelMes.slice(5))-1]}</div><div class="val">${fmtM(gan)}</div><small>Viajes terminados y cobrados, y lo que quedó de cancelaciones.</small></div>
+          <div><div class="lb">Gané en ${MESES[Number(panelMes.slice(5))-1]}</div><div class="val">${fmtM(gan)}</div><small>Viajes terminados y cobrados, lo que quedó de cancelaciones y los recargos con tarjeta.</small></div>
           <div class="op" aria-hidden="true">−</div>
           <div><div class="lb click" onclick="egrMes=panelMes;go('egresos')">Gasté</div><div class="val">${fmtM(gas)}</div><small>Gastos de la agencia. El costo de cada viaje ya está descontado.</small></div>
           <div class="op" aria-hidden="true">=</div>
           <div><div class="lb">Me quedó</div><div class="val">${resVal(res)}</div></div>
         </div>
-        <details><summary>Ver de qué viajes sale</summary><div class="din-lista">${delMes.length ? delMes.map(g=>`<div class="click" onclick="go('reserva','${g.r.id}')"><span>${g.r.id} · ${esc(tituloRes(g.r))}${g.tipo==="Cancelación"?" (cancelación)":""}</span><b>${money(g.monto,g.r.moneda)}</b></div>`).join("") : `<div><span class="muted">Ningún viaje terminó y quedó cobrado en este mes.</span></div>`}</div></details>
+        <details><summary>Ver de qué viajes sale</summary><div class="din-lista">${delMes.length ? delMes.map(g=>`<div class="click" onclick="go('reserva','${g.r.id}')"><span>${g.r.id} · ${esc(tituloRes(g.r))}${g.tipo==="Cancelación"?" (cancelación)":g.tipo==="Recargo"?` (recargo con tarjeta, ${g.c.id})`:""}</span><b>${money(g.monto,monG(g))}</b></div>`).join("") : `<div><span class="muted">Ningún viaje terminó y quedó cobrado en este mes.</span></div>`}</div></details>
       </div>
       <div class="tw"><table class="din-meses"><thead><tr><th>Mes</th><th>Gané</th><th>Gasté</th><th>Me quedó</th></tr></thead><tbody>
         ${meses.map(m=>`<tr class="${m===panelMes?"cur":""}" onclick="panelMes='${m}';render()"><td>${MES3[Number(m.slice(5))-1]}</td><td>${cel(ganadoEn(m))}</td><td>${cel(gastadoEn(m))}</td><td>${celRes(subM(ganadoEn(m),gastadoEn(m)))}</td></tr>`).join("")}
@@ -2120,7 +2133,7 @@ VIEWS.reserva = function(){
     <div class="box"><h2>Cobros y recibos</h2>${CB.length?`<div class="list">${CB.map(x=>`
       <div class="it" onclick="verRecibo('${x.id}')" style="${x.anulado?"opacity:.5;text-decoration:line-through":""}"><span class="when">${fdate(x.fecha)}</span>
         <div><div class="t1">${x.id}</div><div class="tiny">${esc(x.concepto)} · ${esc(x.medio)}</div></div>
-        <div class="r"><b>${money(x.monto,x.moneda)}</b>${x.moneda!==r.moneda?`<div class="tiny">= ${money(x.aplicado,r.moneda)}</div>`:""}</div></div>`).join("")}</div>`
+        <div class="r"><b>${money(x.monto,x.moneda)}</b>${recargoDe(x)>0?`<div class="tiny">${money(x.recargo,x.moneda)} de recargo</div>`:""}${x.moneda!==r.moneda?`<div class="tiny">= ${money(x.aplicado,r.moneda)}</div>`:""}</div></div>`).join("")}</div>`
       :`<div class="muted small">Todavía no hay cobros. Cada cobro genera su recibo numerado.</div>`}</div>
   </aside></div>`;
 };
@@ -2323,13 +2336,30 @@ function formCobro(resId){
   const L = sortBy(DB.reservas.filter(r=>r.estado!=="Cancelada" && (saldo(r)>0.5 || r.id===resId)), r=>nombreCliente(r.clienteId));
   if(!L.length) return toast("No hay reservas con saldo pendiente.");
   const r = byId(DB.reservas, resId) || L[0];
-  cobro = {reservaId:r.id, fecha:today(), monto:"", moneda:r.moneda, aplicado:"", medio:DB.cfg.medios[1]||DB.cfg.medios[0], concepto:"", pagador:nombreCliente(r.clienteId), nota:""};
+  cobro = {reservaId:r.id, fecha:today(), monto:"", moneda:r.moneda, aplicado:"", medio:DB.cfg.medios[1]||DB.cfg.medios[0], concepto:"", pagador:nombreCliente(r.clienteId), nota:"",
+    recargoPct:"", costo:"", _costoManual:0};
   renderCobro(L);
+}
+/* Cuentas del recargo con lo cargado en el formulario. En el formulario, cobro.monto es el importe SIN recargo. */
+const red2 = v => Math.round(n0(v)*100)/100;
+function cuentaRecargo(){
+  const tar = esMedioTarjeta(cobro.medio), base = n0(cobro.monto), pct = tar ? n0(cobro.recargoPct) : 0;
+  const total = red2(base*(1+pct/100)), recargo = red2(total-base);
+  const costo = !tar ? 0 : cobro._costoManual ? n0(cobro.costo) : recargo;
+  return {tar, base, pct, total, recargo, costo, neto:red2(total-costo)};
+}
+function updRecargo(){
+  const k = cuentaRecargo(), m = v => money(v, cobro.moneda, true);
+  const el = $("rcRes"); if(el) el.innerHTML = k.recargo>0
+    ? `El cliente paga <b>${m(k.total)}</b>: ${m(k.base)} del viaje (es lo que baja del saldo) + ${m(k.recargo)} de recargo.`
+    : `Sin recargo: el cliente paga ${m(k.base)} y eso baja del saldo.`;
+  const ec = $("rcCosto"); if(ec && !cobro._costoManual) ec.value = k.costo || "";
+  const en = $("rcNeto"); if(en) en.innerHTML = `Te queda en caja <b>${m(k.neto)}</b>${k.recargo>0 ? ` · ganancia del recargo <b>${m(k.recargo-k.costo)}</b>` : ""}.`;
 }
 function renderCobro(L){
   L = L || sortBy(DB.reservas.filter(r=>r.estado!=="Cancelada" && (saldo(r)>0.5 || r.id===cobro.reservaId)), r=>nombreCliente(r.clienteId));
   const r = byId(DB.reservas, cobro.reservaId), sal = saldo(r);
-  const otra = cobro.moneda !== r.moneda;
+  const otra = cobro.moneda !== r.moneda, tar = esMedioTarjeta(cobro.medio);
   if(!cobro.concepto) cobro.concepto = cobrado(r)>0 ? "Pago parcial" : "Seña";
   openModal(`<div class="modal-h"><h2>Registrar cobro</h2><button class="x" onclick="closeModal()">×</button></div>
     <div class="modal-b"><div class="grid g2">
@@ -2337,18 +2367,25 @@ function renderCobro(L){
         ${opts(L.map(x=>({v:x.id,t:`${x.id} · ${nombreCliente(x.clienteId)} · ${tituloRes(x)} · saldo ${money(saldo(x),x.moneda)}`})), cobro.reservaId)}</select></label>
       <div class="spanall box" style="padding:10px 14px;background:var(--bg)"><div class="row small"><span>Total ${money(totalVenta(r),r.moneda)}</span><span class="muted">·</span><span>Cobrado ${money(cobrado(r),r.moneda)}</span><span class="muted">·</span><b>Saldo ${money(sal,r.moneda)}</b>
         ${sal>0.5?`<button class="btn ghost sm" style="margin-left:auto" onclick="cobro.moneda='${r.moneda}';cobro.monto=${Math.round(sal*100)/100};cobro.concepto=${cobrado(r)>0?"'Saldo'":"'Pago total'"};renderCobro()">Cobrar el saldo completo</button>`:""}</div></div>
-      <label class="f req"><span>Importe recibido</span><input type="number" step="any" min="0" value="${cobro.monto}" autofocus oninput="cobro.monto=this.value;calcAplicado()"></label>
+      <label class="f"><span>Medio de pago</span><select onchange="cobro.medio=this.value;renderCobro()">${opts(DB.cfg.medios, cobro.medio)}</select></label>
       <label class="f"><span>Moneda en que pagó</span><select onchange="cobro.moneda=this.value;cobro.aplicado='';renderCobro()">${opts(MONEDAS, cobro.moneda)}</select></label>
+      <label class="f req"><span>${tar?"Importe sin recargo":"Importe recibido"}</span><input type="number" step="any" min="0" value="${cobro.monto}" autofocus oninput="cobro.monto=this.value;calcAplicado();updRecargo()"></label>
+      ${tar?`<label class="f"><span>Recargo por tarjeta (%)</span><input type="number" step="any" min="0" value="${cobro.recargoPct}" placeholder="Ej.: 15" oninput="cobro.recargoPct=this.value;updRecargo()"></label>`:`<div></div>`}
       ${otra?`<label class="f spanall"><span>Equivale a (${r.moneda}) — se descuenta del saldo</span><input id="apl" type="number" step="any" value="${cobro.aplicado}" oninput="cobro.aplicado=this.value;cobro._manual=1">
-        <span class="hint">Calculado con los tipos de cambio de Configuración. Si acordaste otro, corregilo acá.</span></label>`:""}
+        <span class="hint">Calculado con los tipos de cambio de Configuración. Si acordaste otro, corregilo acá.${tar?" Es la equivalencia del importe sin recargo.":""}</span></label>`:""}
+      ${tar?`<div class="spanall box" style="padding:10px 14px;background:var(--bg)">
+        <div class="small" id="rcRes"></div>
+        <label class="f" style="margin-top:10px"><span>Lo que te descuenta la tarjeta (${cobro.moneda})</span><input id="rcCosto" type="number" step="any" min="0" value="${cobro._costoManual?cobro.costo:""}" oninput="cobro.costo=this.value;cobro._costoManual=1;updRecargo()">
+          <span class="hint">Comisión y costo de las cuotas que se queda el procesador. Si todavía no lo sabés, dejalo igual al recargo y corregilo en Egresos cuando llegue la liquidación. Se carga solo como egreso «${CAT_TARJETA}».</span></label>
+        <div class="small" id="rcNeto" style="margin-top:6px"></div></div>`:""}
       <label class="f"><span>Concepto</span><select onchange="cobro.concepto=this.value">${opts(CONCEPTOS, cobro.concepto)}</select></label>
-      <label class="f"><span>Medio de pago</span><select onchange="cobro.medio=this.value">${opts(DB.cfg.medios, cobro.medio)}</select></label>
       <label class="f"><span>Fecha</span><input type="date" value="${cobro.fecha}" oninput="cobro.fecha=this.value"></label>
       <label class="f"><span>Recibido de</span><input value="${esc(cobro.pagador)}" oninput="cobro.pagador=this.value"></label>
       <label class="f spanall"><span>Nota (aparece en el recibo)</span><input value="${esc(cobro.nota)}" placeholder="Ej.: transferencia desde cuenta de Juan Pérez" oninput="cobro.nota=this.value"></label>
     </div></div>
     <div class="modal-f"><button class="btn sec" onclick="closeModal()">Cancelar</button><button class="btn" onclick="guardarCobro()">Guardar y ver recibo</button></div>`);
   if(otra) calcAplicado();
+  if(tar) updRecargo();
 }
 function convertir(monto, de, a){ const ars = toARS(monto, de); return a==="ARS" ? ars : (n0(DB.cfg.tc[a]) ? ars / n0(DB.cfg.tc[a]) : 0); }
 function calcAplicado(){
@@ -2359,15 +2396,24 @@ function calcAplicado(){
   const el = $("apl"); if(el) el.value = cobro.aplicado;
 }
 function guardarCobro(){
-  const r = byId(DB.reservas, cobro.reservaId);
-  if(!(n0(cobro.monto)>0)) return toast("Cargá el importe recibido.");
+  const r = byId(DB.reservas, cobro.reservaId), k = cuentaRecargo();
+  if(!(k.base>0)) return toast("Cargá el importe recibido.");
+  if(k.pct<0) return toast("El recargo no puede ser negativo.");
+  if(k.costo<0 || k.costo>k.total) return toast("Lo que descuenta la tarjeta tiene que estar entre cero y lo que paga el cliente.");
   if(cobro.moneda===r.moneda) cobro.aplicado = cobro.monto;
   if(!(n0(cobro.aplicado)>0)) return toast("Falta la equivalencia en la moneda de la reserva.");
   if(n0(cobro.aplicado) > saldo(r)+0.5 && !confirm(`El cobro supera el saldo de la reserva (${money(saldo(r),r.moneda)}). ¿Registrarlo igual?`)) return;
   const sAntes = saldo(r);
-  const x = {id:nuevoId("REC"), reservaId:r.id, clienteId:r.clienteId, fecha:cobro.fecha||today(), monto:n0(cobro.monto), moneda:cobro.moneda,
+  /* monto = lo que pagó el cliente (con recargo); aplicado = lo que baja del saldo (sin recargo) */
+  const x = {id:nuevoId("REC"), reservaId:r.id, clienteId:r.clienteId, fecha:cobro.fecha||today(), monto:k.total, moneda:cobro.moneda,
     aplicado:n0(cobro.aplicado), medio:cobro.medio, concepto:cobro.concepto, pagador:cobro.pagador.trim()||nombreCliente(r.clienteId), nota:cobro.nota.trim(),
     saldoAntes:sAntes, saldoDespues:sAntes-n0(cobro.aplicado), anulado:false};
+  if(k.recargo>0){ x.recargoPct = k.pct; x.recargo = k.recargo; }
+  if(k.costo>0){
+    const e = {id:nuevoId("EGR"), fecha:x.fecha, categoria:CAT_TARJETA, descripcion:`${x.medio} · recibo ${x.id} (${r.id})`, tipoGasto:"Variable",
+      monto:k.costo, moneda:x.moneda, medio:x.medio, comprobante:"", notas:"Cargado solo al registrar el cobro. Corregí el monto cuando llegue la liquidación de la tarjeta.", cobroId:x.id};
+    DB.egresos.push(e); x.egresoId = e.id;
+  }
   DB.cobros.push(x); save(); cobro = null; closeModal(); render(); verRecibo(x.id);
 }
 function reciboHTML(x){
@@ -2382,12 +2428,12 @@ function reciboHTML(x){
       <div class="monto">${money(x.monto, x.moneda, true)}</div>
       <div style="font-style:italic">${montoEnLetras(x.monto, x.moneda)}</div>
       en concepto de <b>${esc(x.concepto.toLowerCase())}</b> de la reserva <b>${r.id||""}</b> — ${esc(tituloRes(r))}${r.salida?`, salida ${fdate(r.salida,1)}`:""}${paxCount(r)?`, ${paxCount(r)} pasajeros`:""}.
-      Medio de pago: ${esc(x.medio)}.${x.moneda!==r.moneda?` Equivale a ${money(x.aplicado, r.moneda, true)} imputados a la reserva.`:""}${x.nota?`<br>${esc(x.nota)}`:""}
+      Medio de pago: ${esc(x.medio)}.${recargoDe(x)>0?` Incluye ${money(x.recargo, x.moneda, true)} de recargo por pago con tarjeta (${x.recargoPct}% sobre ${money(x.monto-x.recargo, x.moneda, true)}), que no descuenta del saldo.`:""}${x.moneda!==r.moneda?` Equivale a ${money(x.aplicado, r.moneda, true)} imputados a la reserva.`:""}${x.nota?`<br>${esc(x.nota)}`:""}
     </div>
     <table><tbody>
       <tr><td>Total de la reserva</td><td class="num">${money(total, r.moneda, true)}</td></tr>
       <tr><td>Saldo anterior a este pago</td><td class="num">${money(x.saldoAntes ?? total, r.moneda, true)}</td></tr>
-      <tr><td>Este pago</td><td class="num">− ${money(x.aplicado, r.moneda, true)}</td></tr>
+      <tr><td>Este pago${recargoDe(x)>0?" (sin el recargo)":""}</td><td class="num">− ${money(x.aplicado, r.moneda, true)}</td></tr>
       <tr><td><b>Saldo pendiente</b></td><td class="num"><b>${money(Math.max(0, x.saldoDespues ?? 0), r.moneda, true)}</b></td></tr>
     </tbody></table>
     <div class="firma"><div>Firma y aclaración</div><div>${esc(g.agencia)}</div></div>
@@ -2396,7 +2442,9 @@ function reciboHTML(x){
 function verRecibo(id){
   const x = byId(DB.cobros,id);
   openModal(`<div class="modal-h"><h2>Recibo ${x.id}</h2>${x.anulado?`<span class="tag t-wine">Anulado</span>`:""}<button class="x" onclick="closeModal()">×</button></div>
-    <div class="modal-b" style="background:var(--bg)">${reciboHTML(x)}</div>
+    <div class="modal-b" style="background:var(--bg)">${reciboHTML(x)}${(()=>{ const e = egresoTarjeta(x); if(!e || x.anulado) return "";
+      return `<div class="hint" style="margin-top:12px">Uso interno, no sale en el recibo: la tarjeta descuenta ${money(e.monto, e.moneda)} (egreso ${e.id}).${recargoDe(x)>0?` El recargo te deja ${money(recargoDe(x)-n0(e.monto), x.moneda)} de ganancia.`:""}
+        <a style="cursor:pointer" onclick="editar('egresos','${e.id}',()=>verRecibo('${x.id}'))">Corregir lo que descuenta la tarjeta</a></div>`; })()}</div>
     <div class="modal-f">${!x.anulado?`<button class="btn danger l" onclick="anularRecibo('${x.id}')">Anular</button>`:""}
       <button class="btn sec" onclick="copiarRecibo('${x.id}')">Copiar para WhatsApp</button>
       <button class="btn" onclick="imprimirRecibo('${x.id}')">Imprimir o guardar PDF</button></div>`, "wide");
@@ -2873,12 +2921,14 @@ function imprimirContrato(){
 
 function copiarRecibo(id){
   const x = byId(DB.cobros,id), r = byId(DB.reservas,x.reservaId)||{};
-  copiar([`*Recibo ${x.id}* · ${DB.cfg.agencia}`, `Fecha: ${fdate(x.fecha)}`, `Recibimos de ${x.pagador} ${money(x.monto,x.moneda,true)} (${x.concepto.toLowerCase()}, ${x.medio.toLowerCase()}).`,
+  copiar([`*Recibo ${x.id}* · ${DB.cfg.agencia}`, `Fecha: ${fdate(x.fecha)}`, `Recibimos de ${x.pagador} ${money(x.monto,x.moneda,true)} (${x.concepto.toLowerCase()}, ${x.medio.toLowerCase()}${recargoDe(x)>0?`, incluye ${money(x.recargo,x.moneda,true)} de recargo`:""}).`,
     `Reserva ${r.id} · ${tituloRes(r)}`, `Saldo pendiente: ${money(Math.max(0,x.saldoDespues??0), r.moneda, true)}`, "", "¡Gracias!"].join("\n"), "Recibo copiado.");
 }
 function anularRecibo(id){
-  if(!confirm("¿Anular este recibo? El número queda registrado como anulado y el importe vuelve al saldo de la reserva.")) return;
-  const x = byId(DB.cobros,id); x.anulado = true; x.fechaAnulado = today(); save(); verRecibo(id); render(); toast("Recibo anulado.");
+  const x = byId(DB.cobros,id), e = egresoTarjeta(x);
+  if(!confirm(`¿Anular este recibo? El número queda registrado como anulado y el importe vuelve al saldo de la reserva.${e?` También se borra el egreso ${e.id} de lo que descontaba la tarjeta.`:""}`)) return;
+  if(e) DB.egresos = DB.egresos.filter(y=>y.id!==e.id);
+  x.anulado = true; x.fechaAnulado = today(); save(); verRecibo(id); render(); toast("Recibo anulado.");
 }
 
 let cobMes = mesDe(today()), cobMedio = "";
@@ -2896,7 +2946,7 @@ VIEWS.cobros = function(){
     ${L.length?`<div class="box flat"><div class="tw"><table><thead><tr><th>Recibo</th><th>Fecha</th><th>Recibido de</th><th>Reserva</th><th>Concepto</th><th>Medio</th><th class="num">Importe</th></tr></thead><tbody>
       ${L.map(c=>{ const r = byId(DB.reservas,c.reservaId)||{}; return `<tr class="click" onclick="verRecibo('${c.id}')" style="${c.anulado?"opacity:.5;text-decoration:line-through":""}">
         <td class="id">${c.id}</td><td>${fdate(c.fecha)}</td><td>${esc(c.pagador)}</td><td>${r.id||""}<div class="tiny">${esc(tituloRes(r))}</div></td>
-        <td>${esc(c.concepto)}</td><td>${esc(c.medio)}</td><td class="num">${money(c.monto,c.moneda)}</td></tr>`; }).join("")}</tbody></table></div></div>`
+        <td>${esc(c.concepto)}</td><td>${esc(c.medio)}</td><td class="num">${money(c.monto,c.moneda)}${recargoDe(c)>0?`<div class="tiny">incluye ${money(c.recargo,c.moneda)} de recargo</div>`:""}</td></tr>`; }).join("")}</tbody></table></div></div>`
     :`<div class="box empty"><b>Sin cobros${cobMes?" en "+fmes(cobMes):""}</b>Los cobros se registran desde cada reserva o con el botón de arriba.</div>`}`;
 };
 
