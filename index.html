@@ -672,7 +672,6 @@ const ETAPAS_LEAD = [
   {k:"Negociando",c:"t-terra"},{k:"Reservado",c:"t-olive"},{k:"Perdido",c:"t-wine"}];
 const MOTIVOS_PERDIDA = ["Precio","Eligió otra agencia","Cambió de fecha / postergó","No respondió","Sin disponibilidad","Otro"];
 const ESTADOS_RES = ["Pendiente","Confirmada","Cancelada"];
-const ESTADOS_SVC = ["Solicitado","Confirmado","Cancelado"];
 const TIPO_PAX = ["Adulto","Menor","Infante"];
 const HAB_TIPOS = ["Single","Doble","Triple","Cuádruple","Quíntuple","Familiar","Suite","Departamento","Cabaña"];
 const HAB_CAMAS = ["Matrimonial","Twin (2 individuales)","Matrimonial + individual","Matrimonial + 2 individuales","Individuales","Cama extra / cucheta","A confirmar"];
@@ -1672,7 +1671,7 @@ function opSelect(path, sel){
 }
 
 function nuevoServicio(tipo){
-  const s = {id:uid(), tipo, estado:"Confirmado", proveedorId:"", operadorId:"", localizador:"", costo:"", vtoPago:"", notas:""};
+  const s = {id:uid(), tipo, proveedorId:"", operadorId:"", localizador:"", costo:"", vtoPago:"", notas:""};
   if(tipo==="alojamiento") Object.assign(s,{checkin:ed.salida, checkout:ed.regreso, habitaciones:[{cant:1,tipo:"Doble",camas:"Matrimonial",regimen:"Desayuno"}]});
   if(tipo==="aereo") Object.assign(s,{aerolinea:"",ruta:"",ida:ed.salida,vuelta:ed.regreso,equipaje:"Carry-on"});
   if(tipo==="traslado") Object.assign(s,{tramo:"",fecha:ed.salida,modalidad:"Privado"});
@@ -1684,7 +1683,7 @@ function nuevoServicio(tipo){
 }
 function quitarServicio(i){
   const s = ed.servicios[i];
-  if(pagosSvc(s).length) return toast("Tiene pagos al proveedor registrados. Cambiale el estado a Cancelado en lugar de quitarlo.");
+  if(pagosSvc(s).length) return toast("Este servicio tiene pagos al proveedor. Si se cae todo el viaje, cancelá la reserva; si el pago fue un error, borralo primero.");
   if(!confirm("¿Quitar este servicio?")) return;
   ed.servicios.splice(i,1); render();
 }
@@ -1759,10 +1758,9 @@ function svcBloque(s, i){
   const provFila = pv
     ? `<div class="span2">${provSelect(p+"proveedorId", s.proveedorId, pv[0], pv[1])}</div>${s.tipo!=="paquete"?opSelect(p+"operadorId", s.operadorId):"<div></div>"}`
     : `<div class="span2">${opSelect(p+"operadorId", s.operadorId)}</div><div></div>`;
-  return `<div class="svc" style="${s.estado==="Cancelado"?"opacity:.6":""}">
+  return `<div class="svc">
     <div class="svc-h"><span aria-hidden="true">${t.i}</span><b>${t.t}</b>${sub?`<span class="sub">· ${esc(sub)}</span>`:""}
-      <div class="acts"><select onchange="ev('${p}estado',this.value,1)" style="width:auto;padding:4px 8px" aria-label="Estado del servicio">${opts(ESTADOS_SVC, s.estado)}</select>
-        <button class="x" title="Subir" onclick="moverServicio(${i},-1)">↑</button><button class="x" title="Bajar" onclick="moverServicio(${i},1)">↓</button>
+      <div class="acts"><button class="x" title="Subir" onclick="moverServicio(${i},-1)">↑</button><button class="x" title="Bajar" onclick="moverServicio(${i},1)">↓</button>
         <button class="x" title="Quitar servicio" onclick="quitarServicio(${i})">×</button></div></div>
     <div class="svc-b">${svcCampos(s,i)}
       <div class="svc-row"><div class="svc-sec">Proveedor y pago</div><div class="grid g4">
@@ -2109,14 +2107,13 @@ VIEWS.reserva = function(){
       :`<div class="muted small">${r.paxEstimados?r.paxEstimados+" pasajeros estimados, sin nombres cargados.":"Sin pasajeros cargados."} <a style="cursor:pointer" onclick="editarReserva('${r.id}')">Cargar</a></div>`}</div>
 
     <div class="box flat"><div style="padding:16px 20px 4px"><h2>Servicios</h2></div>
-      ${(r.servicios||[]).length?`<div class="tw"><table><thead><tr><th style="min-width:200px">Servicio</th><th>Estado</th><th class="num">Costo</th><th class="num">Pagado al prov.</th><th></th></tr></thead><tbody>
-      ${r.servicios.map(s=>{ const pg = pagadoSvc(s), deuda = svcC(s,r)-pg;
-        return `<tr style="${s.estado==="Cancelado"?"opacity:.55":""}"><td><span class="tiny">${SVC[s.tipo].t}${s.operadorId?" · vía "+esc(nombreProv(s.operadorId)):""}${s.localizador?" · "+esc(s.localizador):""}</span><div>${svcResumen(s)}</div></td>
-        <td><span class="tag ${s.estado==="Confirmado"?"t-olive":s.estado==="Cancelado"?"t-wine":"t-ocre"}">${s.estado}</span></td>
+      ${(r.servicios||[]).length?`<div class="tw"><table><thead><tr><th style="min-width:200px">Servicio</th><th class="num">Costo</th><th class="num">Pagado al prov.</th><th></th></tr></thead><tbody>
+      ${r.servicios.map(s=>{ const pg = pagadoSvc(s), deuda = svcC(s,r)-pg, viva = r.estado!=="Cancelada" && s.estado!=="Cancelado";
+        return `<tr style="${viva?"":"opacity:.55"}"><td><span class="tiny">${SVC[s.tipo].t}${s.operadorId?" · vía "+esc(nombreProv(s.operadorId)):""}${s.localizador?" · "+esc(s.localizador):""}</span><div>${svcResumen(s)}</div></td>
         <td class="num">${money(svcC(s,r),r.moneda)}<div class="tiny">${paxCount(r)} × ${money(s.costo,r.moneda)}</div></td>
-        <td class="num">${money(pg,r.moneda)}${deuda>0.5&&s.estado!=="Cancelado"?`<div class="tiny" style="${s.vtoPago&&s.vtoPago<=today()?"color:var(--wine);font-weight:600":""}">debe ${money(deuda,r.moneda)}${s.vtoPago?"<br>vence "+fdate(s.vtoPago):""}</div>`:""}</td>
-        <td>${svcC(s,r)>0&&s.estado!=="Cancelado"?`<button class="btn ghost sm" onclick="formPagoProv('${r.id}','${s.id}')">Pagar</button>`:""}</td></tr>`;}).join("")}
-      </tbody><tfoot><tr><td colspan="2">Costo total</td><td class="num">${money(totalCosto(r),r.moneda)}</td><td class="num">${money(pagadoProv(r),r.moneda)}</td><td></td></tr></tfoot></table></div>`
+        <td class="num">${money(pg,r.moneda)}${deuda>0.5&&viva?`<div class="tiny" style="${s.vtoPago&&s.vtoPago<=today()?"color:var(--wine);font-weight:600":""}">debe ${money(deuda,r.moneda)}${s.vtoPago?"<br>vence "+fdate(s.vtoPago):""}</div>`:""}</td>
+        <td>${svcC(s,r)>0&&viva?`<button class="btn ghost sm" onclick="formPagoProv('${r.id}','${s.id}')">Pagar</button>`:""}</td></tr>`;}).join("")}
+      </tbody><tfoot><tr><td>Costo total</td><td class="num">${money(totalCosto(r),r.moneda)}</td><td class="num">${money(pagadoProv(r),r.moneda)}</td><td></td></tr></tfoot></table></div>`
       :`<div class="muted small" style="padding:0 20px 18px">Sin servicios. <a style="cursor:pointer" onclick="editarReserva('${r.id}')">Agregar</a></div>`}</div>
 
     ${PP.length?`<div class="box flat"><div style="padding:16px 20px 4px"><h2>Pagos a proveedores</h2></div><div class="tw"><table><thead><tr><th>Fecha</th><th>Proveedor</th><th>Medio</th><th>Nota</th><th class="num">Importe</th><th></th></tr></thead><tbody>
@@ -2590,7 +2587,7 @@ VIEWS.paquetes = function(){
 /* Convierte un servicio de plantilla en un servicio de reserva con fechas reales */
 function svcDesdePlantilla(t, salida, noches){
   const D = n => salida ? addDays(salida, Math.max(1, n0(n)||1) - 1) : "";
-  const s = {id:uid(), tipo:t.tipo, estado:"Confirmado", proveedorId:t.proveedorId||"", operadorId:t.operadorId||"", localizador:"",
+  const s = {id:uid(), tipo:t.tipo, proveedorId:t.proveedorId||"", operadorId:t.operadorId||"", localizador:"",
     costo:t.costo, vtoPago: salida && t.pagoDias!=="" && t.pagoDias!=null ? addDays(salida, -n0(t.pagoDias)) : "", notas:t.notas||""};
   switch(t.tipo){
     case "alojamiento": { const ci = D(t.dia); Object.assign(s, {checkin:ci, checkout: ci ? addDays(ci, n0(t.noches)||1) : "", habitaciones:[Object.assign({cant:1}, t.hab)]}); break; }

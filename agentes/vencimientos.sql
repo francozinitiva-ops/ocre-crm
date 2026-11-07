@@ -78,10 +78,12 @@ select 'REVISAR', rid, titulo, coalesce(proveedor,'(sin proveedor)')||' · '||ti
   'Deuda con el proveedor sin fecha de vencimiento'
   from svc where deuda > 0.5 and vto_pago is null and salida <= (select d from hoy) + 30
 union all
-select 'REVISAR', id, titulo, cliente, null, moneda, null::date, null,
-  'Reserva cancelada con servicios todavía activos: pasalos a Cancelado y registrá lo que devuelva cada proveedor'
-  from canc where exists (select 1 from jsonb_array_elements(coalesce(data->'servicios','[]'::jsonb)) s
-                          where coalesce(s->>'estado','') <> 'Cancelado')
+select 'REVISAR', id, titulo, cliente, round(rec), moneda, null::date, null,
+  'Reserva cancelada: los proveedores te tienen que devolver lo pagado de más sobre la penalidad'
+  from (select canc.*, coalesce((select sum(case when p.data->>'monto' ~ '^-?[0-9]+(\.[0-9]+)?$' then (p.data->>'monto')::numeric else 0 end)
+                                 from crm_pagos_prov p where p.data->>'reservaId' = canc.id),0)
+                       - coalesce(case when data->'devolucion'->>'penalidad' ~ '^[0-9]+(\.[0-9]+)?$' then (data->'devolucion'->>'penalidad')::numeric end,0) rec
+        from canc) c where rec > 0.5
 union all
 select 'LEGAJO PROVEEDOR', id, nombre, k, null, null, (data->>k)::date, (data->>k)::date - (select d from hoy), 'Vence '||k
   from crm_proveedores, unnest(array['vtoHabilitacion','vtoPoliza','vtoRTO']) k
