@@ -298,6 +298,15 @@ tfoot td{font-weight:650;background:var(--paper2);border-bottom:0}
 .sumline{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--line)}
 .sumline:last-child{border-bottom:0}
 .sumline.big{font-size:17px;font-weight:700;font-stretch:108%}
+.fi-h{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin:14px 0 2px}
+.fi-h:first-child{margin-top:0}
+.fi-nota{font-size:13px;line-height:1.5;background:var(--paper2);border-radius:5px;padding:10px 12px;margin-top:10px}
+.cq-mon{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.cq-res{display:flex;flex-direction:column;gap:6px;margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);font-size:13.5px}
+.cq-res .lin{display:flex;justify-content:space-between;gap:12px}
+.cq-res .lin b{font-variant-numeric:tabular-nums}
+tr.cq-ok td{opacity:.45}
+@media (max-width:700px){.cq-mon{grid-template-columns:1fr}}
 .addtype{display:flex;flex-wrap:wrap;gap:6px}
 .kv{display:grid;grid-template-columns:130px 1fr;gap:6px 12px;font-size:13.5px}
 .kv dt{color:var(--ink2)} .kv dd{margin:0}
@@ -544,7 +553,8 @@ Al firmar, el pasajero titular declara haber leído y aceptado estas condiciones
 const BLANK = {
   cfg: clone(CFG_DEF),
   cont:{CLI:0,PRV:0,DES:0,LEA:0,RES:0,REC:0,PAG:0,EGR:0,PAQ:0,S:0},
-  clientes:[], proveedores:[], destinos:[], leads:[], reservas:[], cobros:[], pagosProv:[], egresos:[], paquetes:[]
+  clientes:[], proveedores:[], destinos:[], leads:[], reservas:[], cobros:[], pagosProv:[], egresos:[], paquetes:[],
+  cuadres:[]   /* cuadres de caja: se guardan en crm_meta (clave "cuadres") */
 };
 let DB = clone(BLANK), persist = true;
 
@@ -558,6 +568,7 @@ function merge(p){
   if(!DB.cfg.catEgresos.includes(CAT_RETIRO)) DB.cfg.catEgresos.push(CAT_RETIRO);
   if(!DB.cfg.catEgresos.includes(CAT_TARJETA)) DB.cfg.catEgresos.splice(Math.max(0, DB.cfg.catEgresos.indexOf(CAT_RETIRO)), 0, CAT_TARJETA);
   DB.cont = Object.assign(clone(BLANK.cont), p.cont||{});
+  if(!Array.isArray(DB.cuadres)) DB.cuadres = [];
   DB.reservas.forEach(migrarReserva);
   DB.leads.forEach(l=>{ if(l.etapa==="Ganado") l.etapa = "Reservado"; });
   /* si una reserva apunta a un lead, el lead queda como Reservado */
@@ -960,6 +971,7 @@ const NAV = [
   {k:"cobros", t:"Cobros y recibos", i:"💵"},
   {k:"pagos", t:"Pagos a operadores", i:"🧾", c:()=>avisos().filter(a=>a.k==="pago").length, hot:()=>avisos().some(a=>a.k==="pago" && ["vencido","hoy"].includes(tramo(a)))},
   {k:"egresos", t:"Egresos", i:"💸"},
+  {k:"cuadrar", t:"Cuadrar caja", i:"⚖️", c:()=>cuadreAtrasado()?"!":"", hot:()=>cuadreAtrasado()},
   {sec:"Bases"},
   {k:"clientes", t:"Clientes", i:"👥", c:()=>DB.clientes.length},
   {k:"proveedores", t:"Proveedores y operadores", i:"🤝", c:()=>DB.proveedores.length},
@@ -987,7 +999,7 @@ function renderSide(){
     <div class="iso-card">${isoV(60)}</div>
     <nav class="nav">${NAV.map(n=> n.sec ? `<div class="nav-sec">${n.sec}</div>` :
       `<a class="${vista===n.k||(vista==="reserva"&&n.k==="reservas")||(vista==="resEdit"&&n.k==="reservas")||(vista==="paqEdit"&&n.k==="paquetes")?"on":""}" onclick="go('${n.k}')"><span class="ni" aria-hidden="true">${n.i}</span>${n.t}
-        ${n.c ? `<span class="cnt ${n.hot&&n.hot()?"hot":""}">${n.c()}</span>`:""}</a>`).join("")}</nav>
+        ${(()=>{ const k = n.c ? n.c() : ""; return k!=="" ? `<span class="cnt ${n.hot&&n.hot()?"hot":""}">${k}</span>` : ""; })()}</a>`).join("")}</nav>
     <div class="side-foot"><span id="syncPill">${pillSync()}</span><br>
       <a onclick="go('config')" style="cursor:pointer">Respaldo y restauración</a>
       ${YO?`<div class="yo">${esc(YO.nombre||YO.email)} · <a onclick="salir()" style="cursor:pointer">Cerrar sesión</a></div>`:""}</div>`;
@@ -1344,6 +1356,7 @@ function panelPlata(){
           : sum(Object.entries(C.ganancia), ([x,v])=>toARS(v,x))<-0.5 ? `<div class="pc-alert fijo">⚠ <span>Salió más de lo ganado: esa diferencia se pagó con plata de clientes o de proveedores.</span></div>` : ""}
         ${C.conAdelanto.length ? `<div class="pc-alert fijo">⚠ <span>Adelantaste ${fmtM(C.adelantos," y ")} a operadores en ${C.conAdelanto.map(r=>`<a style="cursor:pointer" onclick="go('reserva','${r.id}')">${r.id}</a>`).join(", ")}: pagaste más de lo que cobraste.</span></div>` : ""}
         ${C.otraMoneda ? `<div class="tiny" style="margin-top:8px">Hay cobros en una moneda distinta a la de su reserva, como un viaje en dólares pagado en pesos. La caja los suma en la moneda en que entraron y el reparto los cuenta en la de la reserva, así que una columna puede dar de más y la otra de menos.</div>` : ""}
+        ${(()=>{ const u = ultimoCuadre(); return `<div class="tiny" style="margin-top:10px"><a style="cursor:pointer;font-weight:600" onclick="go('cuadrar')">Cuadrar con la plata real</a> · ${u ? "último cuadre el "+fdate(u.fecha)+(cuadreCoincide(u)?" (coincidió)":" (con diferencia)") : "todavía no cuadraste"}</div>`; })()}
         <details><summary>Ver cómo se llega a este número</summary><div class="din-lista">
           ${linea("Plata inicial", sumM(MON_ORD, x=>x, x=>C.inicial[x]))}
           ${linea("Cobraste a clientes", C.cobros, "+ ")}
@@ -1802,6 +1815,59 @@ function resumenHTML(r){
     ${r.id?`<div class="sumline"><span>Cobrado</span><span>${money(cob,r.moneda)}</span></div>
     <div class="sumline big"><span>Saldo</span><span>${money(r.estado==="Cancelada"?0:v-cob,r.moneda)}</span></div>`:""}`;
 }
+/* Las cuentas de una reserva, en limpio: los cinco números (venta, costo, margen, cobrado, pagado)
+   y lo que significan (falta cobrar, falta pagar, cuánto hay en caja de esta reserva y de quién es). */
+function fichaHTML(r){
+  const m = v => money(v, r.moneda), n = paxCount(r);
+  const v = totalVenta(r), c = totalCosto(r), cob = cobrado(r);
+  const pp = DB.pagosProv.filter(p=>p.reservaId===r.id);
+  const ida = sum(pp, p=>Math.max(0,n0(p.monto))), vuelta = sum(pp, p=>Math.max(0,-n0(p.monto))), pag = ida - vuelta;
+  const recargos = sum(cobrosDe(r).filter(x=>x.moneda===r.moneda), recargoDe);
+  const L = (lb, val, sub, cls) => `<div class="sumline"><span>${lb}${sub?`<div class="tiny">${sub}</div>`:""}</span><span class="${cls||""}" style="text-align:right">${val}</span></div>`;
+  const nada = `<span class="muted">Nada</span>`;
+  const cancelada = r.estado==="Cancelada", d = devDe(r);
+
+  let h = `<div class="fi-h">Los números</div>`;
+  if(!cancelada) h += L("Precio de venta", `<b>${m(v)}</b>`, n ? `${n} × ${m(r.tarifaPax)}` : `<span style="color:var(--wine)">faltan los pasajeros</span>`)
+    + L("Costo", m(c), "Lo que cuestan los proveedores")
+    + L("Margen", m(v-c), v ? Math.round((v-c)/v*1000)/10+"% de la venta" : "");
+  h += L("Te cobraste", m(cob), recargos>0.5 ? `más ${m(recargos)} de recargo con tarjeta (se compensa con el costo de la tarjeta)` : "")
+    + L("Le pagaste a proveedores", m(pag), vuelta>0.5 ? `${m(ida)} pagado − ${m(vuelta)} que te devolvieron` : "");
+
+  h += `<div class="fi-h">Qué significa</div>`;
+  if(cancelada){
+    const enCaja = cob - pag - salioDevolucion(r);
+    h += L("Le debés al cliente", debeCliente(r)>0.5 ? m(debeCliente(r)) : nada, debeCliente(r)>0.5 && d ? (d.forma==="Crédito a favor"?"Crédito a favor":"Devolución pendiente") : (!d && cob>0?"Falta definir cuánto se devuelve":""))
+      + L("Le debés al proveedor", penalPorPagar(r)>0.5 ? m(penalPorPagar(r)) : nada, penalPorPagar(r)>0.5 ? "Penalidad sin pagar" : "")
+      + L("El proveedor te tiene que devolver", aReclamarProv(r)>0.5 ? m(aReclamarProv(r)) : nada)
+      + L("De esta reserva tenés en caja", `<b>${m(enCaja)}</b>`, "Lo cobrado − lo pagado a proveedores − lo que ya devolviste");
+    h += `<div class="fi-nota">${d
+      ? `De lo que cobraste (${m(cob)}) se devuelven ${m(d.monto)} y los proveedores se quedan ${m(d.penalidad)} de penalidad. <b>A la agencia le quedan ${m(ganCancel(r))}.</b>`
+      : cob>0 ? `Mientras no definas la devolución, todo lo cobrado (${m(cob)}) sigue siendo del cliente.` : `No hubo cobros: la cancelación no mueve plata.`}</div>`;
+    return h;
+  }
+  const falta = v - cob, debe = c - pag, enCaja = cob - pag, ev = estadoVis(r);
+  const prox = svcActivos(r).filter(s=>s.vtoPago && pagadoSvc(s) < svcC(s,r)-0.5).map(s=>s.vtoPago).sort()[0];
+  h += L("Te falta cobrar", falta>0.5 ? `<b>${m(falta)}</b>` : falta<-0.5 ? `Cobraste ${m(-falta)} de más` : nada,
+        falta>0.5 && r.vtoSaldo ? "Vence el "+fdate(r.vtoSaldo) : "", falta<-0.5 ? "res-neg" : "")
+    + L("Te falta pagar a proveedores", debe>0.5 ? `<b>${m(debe)}</b>` : debe<-0.5 ? `Pagaste ${m(-debe)} de más` : nada,
+        debe>0.5 && prox ? "El próximo pago vence el "+fdate(prox) : "", debe<-0.5 ? "res-neg" : "")
+    + L("De esta reserva tenés en caja", `<b>${m(enCaja)}</b>`, "Lo cobrado − lo pagado a proveedores", enCaja<-0.5 ? "res-neg" : "");
+
+  /* de quién es esa plata: misma regla que el reparto de la caja en el panel */
+  const paraProv = Math.max(0, Math.min(enCaja, debe)), resto = enCaja - paraProv;
+  const ya = ev==="Finalizada";
+  let nota;
+  if(enCaja < -0.5) nota = `Le pagaste a los proveedores ${m(-enCaja)} más de lo que te cobraste. Ese adelanto salió de otra plata de la caja hasta que el cliente pague.`;
+  else if(enCaja <= 0.5) nota = `Todavía no tenés plata de esta reserva en caja.`;
+  else nota = [paraProv>0.5 ? `${m(paraProv)} son del proveedor: falta pagárselos.` : "",
+    resto>0.5 ? (ya ? `${m(resto)} ya son tuyos: el viaje terminó.`
+      : `${m(resto)} son margen, pero todavía no son tuyos: pasan a ser ganancia cuando vuelvan${r.regreso?" ("+fdate(r.regreso)+")":""} y esté todo cobrado. Si el viaje se cae, vuelven al cliente.`) : ""].filter(Boolean).join(" ");
+  const fin = ya ? (realizada(r) ? `<b>Ganancia de este viaje: ${m(v-c)}.</b>` : `<b>El viaje terminó y falta cobrar ${m(falta)}.</b>`)
+    : `<b>Cuando esté todo cobrado y pagado te quedan ${m(v-c)}.</b>`;
+  h += `<div class="fi-nota">${nota} ${fin}</div>`;
+  return h;
+}
 function updSum(){
   if(ed && ed._paq){ const k = $("pkSum"); if(k) k.innerHTML = resumenPaq(ed); return; }
   const el = $("edSum"); if(el) el.innerHTML = barraHTML(ed);
@@ -2122,7 +2188,7 @@ VIEWS.reserva = function(){
   </div>
 
   <aside class="sticky">
-    <div class="box"><h2>Cuenta de la reserva</h2>${resumenHTML(r)}
+    <div class="box"><h2>Las cuentas de esta reserva</h2>${fichaHTML(r)}
       ${sal>0.5&&r.estado!=="Cancelada"?`<div class="tiny" style="margin-top:6px;${r.vtoSaldo&&r.vtoSaldo<=today()?"color:var(--wine);font-weight:600":""}">${r.vtoSaldo?"El saldo vence el "+fdate(r.vtoSaldo,1):"Sin fecha de vencimiento del saldo"}</div>`:""}
       ${r.contratoGenerado?`<div class="tiny">Contrato generado el ${fdate(r.contratoGenerado)}</div>`:""}
       ${v?`<div class="progress"><i style="width:${Math.min(100,cob/v*100)}%"></i></div><div class="tiny">${Math.round(cob/v*100)}% cobrado</div>`:""}
@@ -3371,6 +3437,102 @@ function borrarTodo(){
 let egrMes = mesDe(today()), egrCat = "";
 const mesAnterior = ym => { const d = new Date(ym+"-15T12:00:00"); d.setMonth(d.getMonth()-1); return d.getFullYear()+"-"+pad(d.getMonth()+1); };
 const mesSiguiente = ym => { const d = new Date(ym+"-15T12:00:00"); d.setMonth(d.getMonth()+1); return d.getFullYear()+"-"+pad(d.getMonth()+1); };
+/* ═════════════ CUADRAR CAJA ═════════════
+   Compara la plata real (banco, Mercado Pago, efectivo) con la caja que calcula el sistema.
+   Si coinciden, lo cargado está bien en conjunto. Si no, la lista de movimientos ayuda a encontrar qué falta.
+   Cada cuadre se guarda con lo que había y lo que decía el sistema en ese momento. */
+const LUGARES = [["banco","Banco"],["mp","Mercado Pago"],["efectivo","Efectivo"]];
+const TOL_CUADRE = 1;   /* diferencias de hasta $1 (redondeos) cuentan como cuadrado */
+let cq = null;          /* cuadre en carga: {fecha, real:{ARS:{banco,mp,efectivo}}, ok:{idMovimiento:true}, nota} */
+const ultimoCuadre = () => DB.cuadres.slice().sort((a,b)=>(a.fecha+a.id).localeCompare(b.fecha+b.id)).at(-1) || null;
+const cuadreCoincide = q => Object.values(q.mon||{}).every(x=>Math.abs(n0(x.dif))<=TOL_CUADRE);
+const cuadreAtrasado = () => { const u = ultimoCuadre(); return u ? diffDays(u.fecha, today()) > 7 : movimientos().length > 0; };
+/* Cada entrada y salida de plata, con signo (+ entra, − sale). Sumadas a la plata inicial dan la caja del panel. */
+function movimientos(){
+  const L = [];
+  DB.cobros.filter(c=>!c.anulado).forEach(c=>L.push({id:c.id, fecha:c.fecha||"", tipo:"Cobro", mon:c.moneda||"ARS", monto:n0(c.monto),
+    det:`${c.id} · ${c.reservaId} · ${nombreCliente(c.clienteId)}${c.medio?" · "+c.medio:""}`, ir:`go('reserva','${c.reservaId}')`}));
+  DB.pagosProv.forEach(p=>{ const x = n0(p.monto); if(!x) return;
+    L.push({id:p.id, fecha:p.fecha||"", tipo:x>0?"Pago a proveedor":"Te devolvió un proveedor", mon:monPago(p), monto:-x,
+      det:`${p.reservaId} · ${nombreProv(p.proveedorId)}${p.medio?" · "+p.medio:""}`, ir:`go('reserva','${p.reservaId}')`}); });
+  DB.egresos.forEach(e=>L.push({id:e.id, fecha:e.fecha||"", tipo:esGasto(e)?"Gasto":"Retiro de socios", mon:e.moneda||"ARS", monto:-n0(e.monto),
+    det:`${esGasto(e)?e.categoria:""}${esGasto(e)&&e.descripcion?" · ":""}${e.descripcion||""}${e.medio?" · "+e.medio:""}`, ir:`editar('egresos','${e.id}')`}));
+  DB.reservas.forEach(r=>{ const v = salioDevolucion(r); if(!v) return; const d = devDe(r), usado = d.estado==="Usado";
+    L.push({id:r.id+"-dev", fecha:d.fechaDev||r.fechaCancel||"", tipo:usado?"Crédito usado":"Devolución a cliente", mon:r.moneda||"ARS", monto:-v,
+      det:`${r.id} · ${nombreCliente(r.clienteId)}${usado?" · no sale plata: compensa el cobro cargado en la reserva nueva":""}`, ir:`go('reserva','${r.id}')`}); });
+  return L.sort((a,b)=>(b.fecha+b.id).localeCompare(a.fecha+a.id));
+}
+const monsCuadre = mov => MON_ORD.filter(x=>x==="ARS" || mov.some(m=>m.mon===x) || Math.abs(n0((DB.cfg.cajaInicial||{})[x]))>0.5);
+function cqReal(x){ const o = (cq.real||{})[x] || {}; const vals = LUGARES.map(([k])=>o[k]).filter(v=>v!=="" && v!=null);
+  return vals.length ? sum(vals, Number) : null; }
+function cqSet(x, k, v){ cq.real[x] = cq.real[x] || {}; cq.real[x][k] = v; cqUpd(); }
+function cqResHTML(x){
+  const sis = cuentas().caja[x] || 0, real = cqReal(x);
+  if(real===null) return `<div class="cq-res"><div class="lin"><span>Según el sistema</span><b>${money(sis,x)}</b></div><div class="muted small">Cargá cuánto hay para comparar.</div></div>`;
+  const dif = real - sis;
+  const msg = Math.abs(dif)<=TOL_CUADRE ? `<span class="tag t-olive">Coincide</span> Lo cargado en el sistema coincide con la plata real.`
+    : dif>0 ? `<span class="tag t-ocre">Sobran ${money(dif,x)}</span> Hay más plata de la que dice el sistema. Suele ser algo que entró y no se cargó: un cobro, una devolución de un proveedor o plata que pusieron los socios (esa va en Configuración, como plata inicial).`
+    : `<span class="tag t-wine">Faltan ${money(-dif,x)}</span> Hay menos plata de la que dice el sistema. Suele ser algo que salió y no se cargó: un gasto, una comisión del banco o de la tarjeta, un pago a proveedor o un retiro.`;
+  return `<div class="cq-res"><div class="lin"><span>Plata real</span><b>${money(real,x)}</b></div>
+    <div class="lin"><span>Según el sistema</span><b>${money(sis,x)}</b></div>
+    <div class="lin"><span>Diferencia</span><b class="${Math.abs(dif)<=TOL_CUADRE?"res-pos":"res-neg"}">${dif>0?"+":""}${money(dif,x)}</b></div>
+    <div class="small" style="margin-top:4px">${msg}</div></div>`;
+}
+function cqUpd(){ monsCuadre(movimientos()).forEach(x=>{ const el = $("cqRes_"+x); if(el) el.innerHTML = cqResHTML(x); }); }
+function cqTick(id, on){ cq.ok[id] = on; const tr = $("mv_"+id); if(tr) tr.classList.toggle("cq-ok", on); }
+function guardarCuadre(){
+  const C = cuentas(), mov = movimientos(), mon = {};
+  monsCuadre(mov).forEach(x=>{ const real = cqReal(x); if(real===null) return; const o = cq.real[x] || {}, sis = C.caja[x] || 0;
+    mon[x] = Object.assign(Object.fromEntries(LUGARES.map(([k])=>[k, n0(o[k])])), {real, sistema:sis, dif:Math.round((real-sis)*100)/100}); });
+  if(!Object.keys(mon).length) return toast("Cargá cuánto hay en al menos una moneda.");
+  DB.cuadres.push({id:nuevoId("CUA"), fecha:cq.fecha||today(), hora:new Date().toTimeString().slice(0,5), por:(YO&&YO.nombre)||"", mon, nota:(cq.nota||"").trim()});
+  cq = null; save(); render(); toast("Cuadre guardado.");
+}
+function borrarCuadre(id){ if(!confirm("¿Borrar este cuadre del historial?")) return; DB.cuadres = DB.cuadres.filter(q=>q.id!==id); save(); render(); }
+
+VIEWS.cuadrar = function(){
+  const C = cuentas(), mov = movimientos(), mons = monsCuadre(mov), u = ultimoCuadre();
+  if(!cq) cq = {fecha:today(), real:{}, ok:{}, nota:""};
+  const desde = u ? u.fecha : "";
+  const lista = (desde ? mov.filter(m=>m.fecha>=desde) : mov).slice(0, 300);
+  const entra = sumM(lista.filter(m=>m.monto>0), m=>m.mon, m=>m.monto), sale = sumM(lista.filter(m=>m.monto<0), m=>m.mon, m=>-m.monto);
+  const hist = DB.cuadres.slice().sort((a,b)=>(b.fecha+b.id).localeCompare(a.fecha+a.id));
+  const inp = (x,k,lb) => `<label class="f"><span>${lb} (${x})</span><input type="number" step="any" inputmode="decimal" value="${esc(((cq.real[x]||{})[k])??"")}" placeholder="0" oninput="cqSet('${x}','${k}',this.value)"></label>`;
+  return head("Cuadrar caja", "Compará la plata que tenés de verdad con la que dice el sistema. Si coinciden, todo lo cargado está bien, aunque no hayas seguido cada movimiento. Hacelo una vez por semana.",
+      `<button class="btn" onclick="guardarCuadre()">Guardar cuadre</button>`) +
+  `<div class="box"><h2>¿Cuánta plata hay hoy?</h2>
+    <p class="small muted" style="margin-top:-4px">Mirá el saldo del banco, el de Mercado Pago y contá el efectivo. Solo la plata de la agencia.</p>
+    ${mons.map(x=>`<div style="margin-top:14px">${mons.length>1?`<div class="fi-h">${x==="ARS"?"Pesos":x==="USD"?"Dólares":"Reales"}</div>`:""}
+      <div class="cq-mon">${LUGARES.map(([k,lb])=>inp(x,k,lb)).join("")}</div>
+      <div id="cqRes_${x}">${cqResHTML(x)}</div></div>`).join("")}
+    <div class="grid g3" style="margin-top:16px">
+      <label class="f"><span>Fecha del cuadre</span><input type="date" value="${esc(cq.fecha)}" onchange="cq.fecha=this.value"></label>
+      <label class="f span2"><span>Nota</span><input value="${esc(cq.nota)}" placeholder="Opcional: qué encontraste, qué faltaba cargar…" oninput="cq.nota=this.value"></label>
+    </div>
+    ${negM(C.caja) ? `<div class="pc-alert fijo">⚠ <span>El sistema da caja negativa: seguro falta cargar en Configuración la plata con la que arrancaron o lo que pusieron los socios.</span></div>` : ""}
+  </div>
+
+  <div class="box flat"><div style="padding:16px 20px 4px"><h2>${desde ? `Movimientos desde el último cuadre <span class="tiny">desde el ${fdate(desde)}, incluido</span>` : "Todos los movimientos"}</h2>
+    <p class="small muted" style="margin:2px 0 8px">Si hay diferencia, tildá cada movimiento que encuentres en el resumen del banco o de Mercado Pago. El que no aparezca, o el que aparezca allá y no acá, es la diferencia.</p></div>
+    ${lista.length ? `<div class="tw"><table><thead><tr><th style="width:34px"></th><th>Fecha</th><th>Qué</th><th>Detalle</th><th class="num">Entró</th><th class="num">Salió</th></tr></thead><tbody>
+      ${lista.map(m=>`<tr id="mv_${esc(m.id)}" class="${cq.ok[m.id]?"cq-ok":""}"><td><input type="checkbox" aria-label="Encontrado" ${cq.ok[m.id]?"checked":""} onchange="cqTick('${esc(m.id)}',this.checked)"></td>
+        <td>${fdate(m.fecha)}</td><td>${esc(m.tipo)}</td><td class="small"><a style="cursor:pointer" onclick="${m.ir}">${esc(m.det)}</a></td>
+        <td class="num">${m.monto>0?money(m.monto,m.mon):""}</td><td class="num">${m.monto<0?money(-m.monto,m.mon):""}</td></tr>`).join("")}</tbody>
+      <tfoot><tr><td colspan="4">Total</td><td class="num">${fmtM(entra)}</td><td class="num">${fmtM(sale)}</td></tr></tfoot></table></div>`
+    : `<div class="muted small" style="padding:0 20px 18px">No hubo movimientos desde el último cuadre.</div>`}
+  </div>
+
+  <div class="box flat"><div style="padding:16px 20px 4px"><h2>Historial de cuadres</h2></div>
+    ${hist.length ? `<div class="tw"><table><thead><tr><th>Fecha</th><th>Quién</th><th class="num">Plata real</th><th class="num">Según el sistema</th><th class="num">Diferencia</th><th>Nota</th><th></th></tr></thead><tbody>
+      ${hist.map(q=>{ const ks = MON_ORD.filter(x=>q.mon[x]);
+        return `<tr><td>${fdate(q.fecha)}${q.hora?` <span class="tiny">${esc(q.hora)}</span>`:""}</td><td class="small">${esc(q.por||"—")}</td>
+        <td class="num">${ks.map(x=>money(q.mon[x].real,x)).join("<br>")}</td><td class="num">${ks.map(x=>money(q.mon[x].sistema,x)).join("<br>")}</td>
+        <td class="num">${ks.map(x=>Math.abs(q.mon[x].dif)<=TOL_CUADRE?`<span class="res-pos">Coincide</span>`:`<span class="res-neg">${q.mon[x].dif>0?"+":""}${money(q.mon[x].dif,x)}</span>`).join("<br>")}</td>
+        <td class="small">${esc(q.nota)}</td><td><button class="x" title="Borrar cuadre" onclick="borrarCuadre('${q.id}')">×</button></td></tr>`; }).join("")}</tbody></table></div>`
+    : `<div class="muted small" style="padding:0 20px 18px">Todavía no hay cuadres guardados.</div>`}
+  </div>`;
+};
+
 VIEWS.egresos = function(){
   const delMes = DB.egresos.filter(e=>!egrMes || mesDe(e.fecha)===egrMes);
   const L = sortBy(delMes.filter(e=>!egrCat || e.categoria===egrCat), e=>e.fecha+e.id).reverse();
