@@ -1551,6 +1551,7 @@ function verLead(id){
       <div class="hist">${(l.historial||[]).slice().reverse().map(h=>`<div class="h"><div class="w">${fdate(h.fecha)}</div><div class="${h.auto?"muted small":""}">${esc(h.texto)}</div></div>`).join("") || `<div class="tiny">Sin registros todavía.</div>`}</div>
     </div>
     <div class="modal-f"><button class="btn sec l" onclick="closeModal();editar('leads','${l.id}')">Editar datos</button>
+      ${leadAbierto(l)?`<button class="btn sec" onclick="msjDesdeLead('${l.id}')">Armar mensaje</button>`:""}
       ${leadAbierto(l)?`<select onchange="if(this.value){const x=byId(DB.leads,'${l.id}');moverLead(x,this.value);save();verLead('${l.id}');render()}" style="width:auto">${opts(ETAPAS_LEAD.filter(e=>leadAbierto({etapa:e.k})&&e.k!==l.etapa).map(e=>e.k),"","Mover a…")}</select>
       <button class="btn danger" onclick="marcarPerdido('${l.id}')">Perdido</button>
       <button class="btn" onclick="marcarReservado('${l.id}')">Reservado</button>`
@@ -3453,6 +3454,16 @@ function msjCliente(v){
     return render();
   }
   msjPrev();
+}
+/* Desde la ficha de un lead: abre el armador con su nombre, destino y pasajeros. */
+function msjDesdeLead(id){
+  const l = byId(DB.leads, id); if(!l) return;
+  if(msj && msjTexto(msj) && !confirm("Hay un mensaje a medio armar. ¿Reemplazarlo por uno nuevo para este lead?")) return;
+  msj = msjNuevo();
+  msj.cliente = (l.nombre||"").trim();
+  const d = byId(DB.destinos, l.destinoId); if(d) msj.destino = d.nombre;
+  if(/^\d+$/.test(String(l.pax||"").trim())) msj.adultos = String(l.pax).trim();
+  closeModal(); go("mensajes");
 }
 function msjAcl(i){
   const x = (DB.cfg.aclaraciones||[])[i]; if(x==null) return;
