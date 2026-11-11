@@ -517,6 +517,7 @@ const CFG_DEF = {
   temporadas:["Verano","Vacaciones de invierno","Fines de semana largos","Otoño / primavera","Todo el año"],
   msgCumple:"¡Feliz cumpleaños, {nombre}! 🎉 Desde {agencia} te deseamos un gran año, ojalá lleno de viajes. ¡Un abrazo!",
   avisoDias:7,
+  hoteles:[],   /* descripciones de hoteles ya usadas en mensajes de cotización: {nombre, desc} */
   aclaraciones:["Tarifa sujeta a disponibilidad al momento de reservar.","Esta cotización no implica reserva.","No incluye gastos personales ni servicios no detallados.","Valores en dólares, pagaderos en pesos al tipo de cambio del día de pago.","Recomendamos contratar asistencia al viajero."],
   diasPagoProv:3, diasCliente:2,
   feriados:["2026-11-06 Día del Bancario (bancos cerrados)","2026-11-09 Feriado por la visita del Papa León XIV","2026-11-23 Día de la Soberanía Nacional (trasladado)",
@@ -3336,7 +3337,8 @@ function cargarCatalogo(){
    Arma el texto de una cotización para copiar y pegar. No calcula precios y no
    guarda nada: lo que se escribe acá vive en memoria hasta recargar la página.
    Solo lee clientes, leads y destinos. Las aclaraciones estándar están en
-   Configuración (DB.cfg.aclaraciones). */
+   Configuración (DB.cfg.aclaraciones). Lo único que guarda es la descripción de
+   cada hotel (DB.cfg.hoteles), al copiar, para no tener que escribirla de nuevo. */
 let msj = null;
 const msjNuevo = () => ({cliente:"", destino:"", ida:"", vuelta:"", adultos:"2", menores:"", alojamiento:"", regimen:"", hotel:"",
   servicios:"", saleDesde:"", vuelo:"", escalaEn:"", moneda:"USD", monto:"", por:"por persona", pago:"", acl:[], aclExtra:""});
@@ -3403,12 +3405,40 @@ function msjContacto(){
   const l = DB.leads.find(x=>(x.nombre||"").trim().toLowerCase()===q);
   return l ? {tipo:"lead", tel:l.telefono, x:l} : null;
 }
+/* Hoteles recordados: nombre + descripción, dentro de la configuración. */
+const msjHoteles = () => (DB.cfg.hoteles = Array.isArray(DB.cfg.hoteles) ? DB.cfg.hoteles : []);
+const msjHotel = n => { const q = String(n||"").trim().toLowerCase(); return q ? msjHoteles().find(h=>h.nombre.toLowerCase()===q) : null; };
+/* Al elegir un hotel ya usado, trae su descripción (si el campo está vacío). */
+function msjAloj(v){
+  msj.alojamiento = v;
+  const h = msjHotel(v);
+  if(h && !msj.hotel.trim()){ msj.hotel = h.desc; return render(); }
+  msjPrev();
+}
+/* Se llama al copiar o abrir WhatsApp: guarda o actualiza la descripción del hotel. */
+function msjGuardarHotel(){
+  const n = msj.alojamiento.trim(), d = msj.hotel.trim();
+  if(!n || !d) return;
+  const h = msjHotel(n);
+  if(!h) msjHoteles().push({nombre:n, desc:d});
+  else if(h.desc!==d) h.desc = d;
+  else return;
+  save(); msjPrev();
+}
+function msjOlvidarHotel(){
+  const h = msjHotel(msj.alojamiento); if(!h) return;
+  if(!confirm(`¿Olvidar la descripción guardada de ${h.nombre}?`)) return;
+  DB.cfg.hoteles = msjHoteles().filter(x=>x!==h); save(); render();
+}
 function msjSet(k, v){ msj[k] = v; msjPrev(); }
 function msjPrev(){
   const txt = msjTexto(msj), el = $("msjPrev");
   if(el) el.innerHTML = txt ? esc(txt).replace(/\*([^*\n]+)\*/g,"<b>$1</b>") : `<span class="muted">Completá el formulario y el mensaje aparece acá.</span>`;
   const n = msjNoches(msj.ida, msj.vuelta), nn = $("msjNoches");
   if(nn) nn.textContent = n ? (n===1 ? "1 noche" : n+" noches") : (msj.ida && msj.vuelta ? "La vuelta tiene que ser después de la ida." : "");
+  const h = msjHotel(msj.alojamiento), hh = $("msjHotelHint");
+  if(hh) hh.innerHTML = h && h.desc===msj.hotel.trim() ? `Descripción guardada de este hotel. <a style="cursor:pointer" onclick="msjOlvidarHotel()">Olvidar</a>`
+    : msj.alojamiento.trim() && msj.hotel.trim() ? (h ? "Al copiar el mensaje se actualiza la descripción guardada." : "Al copiar el mensaje, esta descripción queda guardada para la próxima.") : "";
   const c = msjContacto(), ci = $("msjCont");
   if(ci) ci.textContent = c ? `Está en el CRM como ${c.tipo}${c.tel ? " · " + c.tel : " · sin teléfono cargado"}.` : "";
 }
@@ -3432,11 +3462,13 @@ function msjAcl(i){
 function msjCopiar(){
   const txt = msjTexto(msj);
   if(!txt) return toast("Todavía no hay nada para copiar.");
+  msjGuardarHotel();
   copiar(txt, "Mensaje copiado. Pegalo en WhatsApp.");
 }
 function msjAbrir(){
   const txt = msjTexto(msj);
   if(!txt) return toast("Todavía no hay nada para enviar.");
+  msjGuardarHotel();
   const c = msjContacto(), n = c ? waNum(c.tel) : "";
   window.open(`https://wa.me/${n}?text=${encodeURIComponent(txt)}`, "_blank", "noopener");
 }
@@ -3449,7 +3481,7 @@ VIEWS.mensajes = function(){
   const nombres = [...new Set(sortBy(DB.clientes,nom).map(nom).concat(sortBy(DB.leads.filter(leadAbierto),l=>l.nombre||"").map(l=>(l.nombre||"").trim())).filter(x=>x && x!=="—"))];
   const acl = DB.cfg.aclaraciones||[];
   setTimeout(msjPrev, 0);
-  return head("Mensajes de cotización", "Arma el texto de la cotización para WhatsApp. No calcula precios ni guarda nada.",
+  return head("Mensajes de cotización", "Arma el texto de la cotización para WhatsApp. No calcula precios ni guarda los mensajes.",
     `<button class="btn sec" onclick="msjLimpiar()">Limpiar</button>`) +
   `<div class="ed msj"><div>
     <div class="box"><h2>Cliente y destino</h2>
@@ -3464,9 +3496,10 @@ VIEWS.mensajes = function(){
     <div class="box"><h2>Pasajeros y alojamiento</h2>
       <div class="grid g2">
         ${inp("adultos","Adultos",'type="number" min="0"')}${inp("menores","Menores",'type="number" min="0"')}
-        ${inp("alojamiento","Alojamiento")}${inp("regimen","Régimen",'placeholder="Desayuno, media pensión, all inclusive…"')}
+        <label class="f"><span>Alojamiento</span><input list="msjHotelesL" value="${esc(m.alojamiento)}" placeholder="Escribilo o elegí uno ya usado" oninput="msjSet('alojamiento',this.value)" onchange="msjAloj(this.value)">
+          <datalist id="msjHotelesL">${sortBy(msjHoteles(),h=>h.nombre).map(h=>`<option value="${esc(h.nombre)}">`).join("")}</datalist></label>${inp("regimen","Régimen",'placeholder="Desayuno, media pensión, all inclusive…"')}
       </div>
-      <div style="margin-top:12px">${area("hotel","Descripción corta del hotel",3)}</div></div>
+      <div style="margin-top:12px">${area("hotel","Descripción corta del hotel",3)}<span class="hint" id="msjHotelHint"></span></div></div>
     <div class="box"><h2>Servicios y vuelo</h2>
       ${area("servicios","Servicios incluidos (uno por línea)",4,"Traslados aeropuerto – hotel – aeropuerto")}
       <div class="grid g3" style="margin-top:12px">
