@@ -288,6 +288,10 @@ tfoot td{font-weight:650;background:var(--paper2);border-bottom:0}
 /* ── reserva editor ── */
 .ed{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:20px;align-items:start}
 .sticky{position:sticky;top:20px}
+/* ── mensajes de cotización ── */
+.ed.msj{grid-template-columns:minmax(0,1.1fr) minmax(0,1fr)}
+.msj-prev{background:var(--paper2);border:1px solid var(--line);border-radius:8px;padding:14px 16px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.5;min-height:120px}
+.msj .chip{border-radius:8px;text-align:left;white-space:normal}
 .svc{border:1px solid var(--line);border-radius:6px;background:var(--paper);margin-bottom:12px}
 .svc-h{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--ocreS);border-radius:6px 6px 0 0}
 .svc-h b{font-weight:650}
@@ -447,7 +451,7 @@ tr.cq-ok td{opacity:.45}
   .ct-head svg{width:34px;height:26px}
 }
 @media (max-width:1100px){
-  .ed{grid-template-columns:1fr}
+  .ed,.ed.msj{grid-template-columns:1fr}
   .sticky{position:static}
   .dgrid{grid-template-columns:1fr}
 }
@@ -513,6 +517,7 @@ const CFG_DEF = {
   temporadas:["Verano","Vacaciones de invierno","Fines de semana largos","Otoño / primavera","Todo el año"],
   msgCumple:"¡Feliz cumpleaños, {nombre}! 🎉 Desde {agencia} te deseamos un gran año, ojalá lleno de viajes. ¡Un abrazo!",
   avisoDias:7,
+  aclaraciones:["Tarifa sujeta a disponibilidad al momento de reservar.","Esta cotización no implica reserva.","No incluye gastos personales ni servicios no detallados.","Valores en dólares, pagaderos en pesos al tipo de cambio del día de pago.","Recomendamos contratar asistencia al viajero."],
   diasPagoProv:3, diasCliente:2,
   feriados:["2026-11-06 Día del Bancario (bancos cerrados)","2026-11-09 Feriado por la visita del Papa León XIV","2026-11-23 Día de la Soberanía Nacional (trasladado)",
     "2026-12-07 Día no laborable con fines turísticos","2026-12-08 Inmaculada Concepción","2026-12-25 Navidad","2027-01-01 Año Nuevo","2027-02-08 Carnaval",
@@ -965,6 +970,7 @@ const NAV = [
   {k:"panel", t:"Panel de control", i:"📊"},
   {k:"leads", t:"Leads", i:"🎯", c:()=>DB.leads.filter(leadAbierto).length,
     hot:()=>DB.leads.some(l=>leadAbierto(l) && l.proxSeg && l.proxSeg<=today())},
+  {k:"mensajes", t:"Mensajes de cotización", i:"💬"},
   {k:"reservas", t:"Reservas", i:"🧳", c:()=>DB.reservas.filter(esActiva).length},
   {k:"paquetes", t:"Paquetes", i:"🗺️", c:()=>DB.paquetes.filter(p=>p.activo!=="No").length},
   {k:"avisos", t:"Avisos", i:"🔔", c:()=>avisos().filter(a=>["vencido","hoy","pronto"].includes(tramo(a))).length, hot:()=>urgentes().length>0},
@@ -3326,6 +3332,169 @@ function cargarCatalogo(){
   save(); render(); toast(`${nuevos.length} destinos cargados.`);
 }
 
+/* ═════════════ MENSAJES DE COTIZACIÓN (WhatsApp) ═════════════
+   Arma el texto de una cotización para copiar y pegar. No calcula precios y no
+   guarda nada: lo que se escribe acá vive en memoria hasta recargar la página.
+   Solo lee clientes, leads y destinos. Las aclaraciones estándar están en
+   Configuración (DB.cfg.aclaraciones). */
+let msj = null;
+const msjNuevo = () => ({cliente:"", destino:"", ida:"", vuelta:"", adultos:"2", menores:"", alojamiento:"", regimen:"", hotel:"",
+  servicios:"", saleDesde:"", vuelo:"", escalaEn:"", moneda:"USD", monto:"", por:"por persona", pago:"", acl:[], aclExtra:""});
+const MSJ_MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+function msjFechas(a, b){
+  const p = x => { const [y,m,d] = x.split("-").map(Number); return {y,m,d}; };
+  if(!a && !b) return "";
+  if(!a || !b){ const f = p(a||b); return `${f.d} de ${MSJ_MESES[f.m-1]} de ${f.y}`; }
+  const i = p(a), v = p(b);
+  if(i.y!==v.y) return `${i.d} de ${MSJ_MESES[i.m-1]} de ${i.y} al ${v.d} de ${MSJ_MESES[v.m-1]} de ${v.y}`;
+  if(i.m!==v.m) return `${i.d} de ${MSJ_MESES[i.m-1]} al ${v.d} de ${MSJ_MESES[v.m-1]} de ${v.y}`;
+  return `${i.d} al ${v.d} de ${MSJ_MESES[v.m-1]} de ${v.y}`;
+}
+function msjNoches(a, b){
+  if(!a || !b) return null;
+  const n = Math.round((Date.parse(b+"T00:00:00Z") - Date.parse(a+"T00:00:00Z")) / 86400000);
+  return n > 0 ? n : null;
+}
+function msjPax(m){
+  const a = Math.max(0, parseInt(m.adultos)||0), n = Math.max(0, parseInt(m.menores)||0), L = [];
+  if(a) L.push(a + (a===1 ? " adulto" : " adultos"));
+  if(n) L.push(n + (n===1 ? " menor" : " menores"));
+  return L.join(" y ");
+}
+const msjLineas = t => String(t||"").split("\n").map(x=>x.trim().replace(/^[•\-*]\s*/,"")).filter(Boolean);
+/* El mensaje. Orden fijo: datos principales → sobre el hotel → servicios → vuelos → tarifa → aclaraciones.
+   Los dos primeros bloques van sin emojis. Los bloques vacíos no salen. */
+function msjTexto(m){
+  const B = [], t = x => String(x||"").trim();
+  const p = [];
+  if(t(m.destino)) p.push(`*${t(m.destino).toUpperCase()}*`);
+  const f = msjFechas(m.ida, m.vuelta), n = msjNoches(m.ida, m.vuelta), px = msjPax(m);
+  if(f) p.push("Fechas: " + f);
+  if(n) p.push("Noches: " + n);
+  if(px) p.push("Pasajeros: " + px);
+  if(t(m.alojamiento)) p.push("Alojamiento: " + t(m.alojamiento));
+  if(t(m.regimen)) p.push("Régimen: " + t(m.regimen));
+  if(p.length) B.push(p.join("\n"));
+  if(t(m.hotel)) B.push("*SOBRE EL HOTEL*\n" + t(m.hotel));
+  const sv = msjLineas(m.servicios);
+  if(sv.length) B.push("✅ *SERVICIOS INCLUIDOS*\n" + sv.map(x=>"• "+x).join("\n"));
+  if(t(m.saleDesde) || m.vuelo){
+    let v = t(m.saleDesde) ? "Salida desde " + t(m.saleDesde) : "";
+    const e = m.vuelo==="directo" ? "vuelo directo" : m.vuelo==="escala" ? "con escala" + (t(m.escalaEn) ? " en " + t(m.escalaEn) : "") : "";
+    v = v && e ? v + ", " + e : v || e.charAt(0).toUpperCase() + e.slice(1);
+    B.push("✈️ *VUELOS*\n" + v + ".");
+  }
+  if(t(m.monto) || t(m.pago)){
+    const L = ["💰 *TARIFA*"];
+    if(t(m.monto)) L.push([t(m.moneda), t(m.monto), m.por].filter(Boolean).join(" "));
+    if(t(m.pago)) L.push(t(m.pago));
+    B.push(L.join("\n"));
+  }
+  const ac = (DB.cfg.aclaraciones||[]).filter(x=>m.acl.includes(x)).concat(msjLineas(m.aclExtra));
+  if(ac.length) B.push("*ACLARACIONES*\n" + ac.map(x=>"• "+x).join("\n"));
+  return B.join("\n\n");
+}
+/* Cliente o lead cuyo nombre coincide con lo escrito (para el teléfono y para completar datos del lead). */
+function msjContacto(){
+  const q = (msj.cliente||"").trim().toLowerCase();
+  if(!q) return null;
+  const c = DB.clientes.find(x=>nom(x).toLowerCase()===q);
+  if(c) return {tipo:"cliente", tel:c.telefono, x:c};
+  const l = DB.leads.find(x=>(x.nombre||"").trim().toLowerCase()===q);
+  return l ? {tipo:"lead", tel:l.telefono, x:l} : null;
+}
+function msjSet(k, v){ msj[k] = v; msjPrev(); }
+function msjPrev(){
+  const txt = msjTexto(msj), el = $("msjPrev");
+  if(el) el.innerHTML = txt ? esc(txt).replace(/\*([^*\n]+)\*/g,"<b>$1</b>") : `<span class="muted">Completá el formulario y el mensaje aparece acá.</span>`;
+  const n = msjNoches(msj.ida, msj.vuelta), nn = $("msjNoches");
+  if(nn) nn.textContent = n ? (n===1 ? "1 noche" : n+" noches") : (msj.ida && msj.vuelta ? "La vuelta tiene que ser después de la ida." : "");
+  const c = msjContacto(), ci = $("msjCont");
+  if(ci) ci.textContent = c ? `Está en el CRM como ${c.tipo}${c.tel ? " · " + c.tel : " · sin teléfono cargado"}.` : "";
+}
+/* Al elegir un lead de la lista, completa destino y pasajeros si están vacíos. */
+function msjCliente(v){
+  msj.cliente = v;
+  const c = msjContacto();
+  if(c && c.tipo==="lead"){
+    const d = byId(DB.destinos, c.x.destinoId);
+    if(d && !msj.destino.trim()) msj.destino = d.nombre;
+    if(/^\d+$/.test(String(c.x.pax||"").trim()) && (!msj.adultos || msj.adultos==="2")) msj.adultos = String(c.x.pax).trim();
+    return render();
+  }
+  msjPrev();
+}
+function msjAcl(i){
+  const x = (DB.cfg.aclaraciones||[])[i]; if(x==null) return;
+  msj.acl = msj.acl.includes(x) ? msj.acl.filter(y=>y!==x) : msj.acl.concat(x);
+  render();
+}
+function msjCopiar(){
+  const txt = msjTexto(msj);
+  if(!txt) return toast("Todavía no hay nada para copiar.");
+  copiar(txt, "Mensaje copiado. Pegalo en WhatsApp.");
+}
+function msjAbrir(){
+  const txt = msjTexto(msj);
+  if(!txt) return toast("Todavía no hay nada para enviar.");
+  const c = msjContacto(), n = c ? waNum(c.tel) : "";
+  window.open(`https://wa.me/${n}?text=${encodeURIComponent(txt)}`, "_blank", "noopener");
+}
+function msjLimpiar(){ if(confirm("¿Borrar todo lo que escribiste en el formulario?")){ msj = msjNuevo(); render(); } }
+VIEWS.mensajes = function(){
+  if(!msj) msj = msjNuevo();
+  const m = msj;
+  const inp = (k,l,extra="") => `<label class="f"><span>${l}</span><input value="${esc(m[k])}" oninput="msjSet('${k}',this.value)" ${extra}></label>`;
+  const area = (k,l,rows,ph="") => `<label class="f"><span>${l}</span><textarea rows="${rows}" placeholder="${ph}" oninput="msjSet('${k}',this.value)">${esc(m[k])}</textarea></label>`;
+  const nombres = [...new Set(sortBy(DB.clientes,nom).map(nom).concat(sortBy(DB.leads.filter(leadAbierto),l=>l.nombre||"").map(l=>(l.nombre||"").trim())).filter(x=>x && x!=="—"))];
+  const acl = DB.cfg.aclaraciones||[];
+  setTimeout(msjPrev, 0);
+  return head("Mensajes de cotización", "Arma el texto de la cotización para WhatsApp. No calcula precios ni guarda nada.",
+    `<button class="btn sec" onclick="msjLimpiar()">Limpiar</button>`) +
+  `<div class="ed msj"><div>
+    <div class="box"><h2>Cliente y destino</h2>
+      <div class="grid g2">
+        <label class="f"><span>Cliente o lead</span><input list="msjClientes" value="${esc(m.cliente)}" placeholder="Elegí de la lista o escribí el nombre" oninput="msjSet('cliente',this.value)" onchange="msjCliente(this.value)">
+          <datalist id="msjClientes">${nombres.map(x=>`<option value="${esc(x)}">`).join("")}</datalist><span class="hint" id="msjCont"></span></label>
+        <label class="f"><span>Destino</span><input list="msjDestinos" value="${esc(m.destino)}" placeholder="Elegí de la lista o escribilo" oninput="msjSet('destino',this.value)">
+          <datalist id="msjDestinos">${sortBy(DB.destinos,d=>d.nombre).map(d=>`<option value="${esc(d.nombre)}">`).join("")}</datalist></label>
+        <label class="f"><span>Fecha de ida</span><input type="date" value="${esc(m.ida)}" oninput="msjSet('ida',this.value)"></label>
+        <label class="f"><span>Fecha de vuelta</span><input type="date" value="${esc(m.vuelta)}" oninput="msjSet('vuelta',this.value)"><span class="hint" id="msjNoches"></span></label>
+      </div></div>
+    <div class="box"><h2>Pasajeros y alojamiento</h2>
+      <div class="grid g2">
+        ${inp("adultos","Adultos",'type="number" min="0"')}${inp("menores","Menores",'type="number" min="0"')}
+        ${inp("alojamiento","Alojamiento")}${inp("regimen","Régimen",'placeholder="Desayuno, media pensión, all inclusive…"')}
+      </div>
+      <div style="margin-top:12px">${area("hotel","Descripción corta del hotel",3)}</div></div>
+    <div class="box"><h2>Servicios y vuelo</h2>
+      ${area("servicios","Servicios incluidos (uno por línea)",4,"Traslados aeropuerto – hotel – aeropuerto")}
+      <div class="grid g3" style="margin-top:12px">
+        ${inp("saleDesde","El vuelo sale desde",'placeholder="Mendoza"')}
+        <label class="f"><span>Escala</span><select onchange="msj.vuelo=this.value;render()">${[["","No aclarar"],["directo","Vuelo directo"],["escala","Con escala"]].map(o=>`<option value="${o[0]}" ${m.vuelo===o[0]?"selected":""}>${o[1]}</option>`).join("")}</select></label>
+        ${m.vuelo==="escala" ? inp("escalaEn","Escala en",'placeholder="Buenos Aires"') : ""}
+      </div></div>
+    <div class="box"><h2>Tarifa</h2>
+      <p class="small muted" style="margin-top:-6px">El monto sale tal cual lo escribís: acá no se hace ninguna cuenta.</p>
+      <div class="grid g3">
+        <label class="f"><span>Moneda</span><select onchange="msjSet('moneda',this.value)">${["USD","ARS","BRL"].map(x=>`<option ${m.moneda===x?"selected":""}>${x}</option>`).join("")}</select></label>
+        ${inp("monto","Monto",'placeholder="980"')}
+        <label class="f"><span>El monto es</span><select onchange="msjSet('por',this.value)">${["por persona","total"].map(x=>`<option ${m.por===x?"selected":""}>${x}</option>`).join("")}</select></label>
+      </div>
+      <div style="margin-top:12px">${area("pago","Condiciones de pago",2)}</div></div>
+    <div class="box"><h2>Aclaraciones</h2>
+      ${acl.length ? `<div class="chips">${acl.map((x,i)=>`<button type="button" class="chip ${m.acl.includes(x)?"on":""}" onclick="msjAcl(${i})">${esc(x)}</button>`).join("")}</div>`
+        : `<p class="small muted">No hay aclaraciones guardadas.</p>`}
+      <p class="hint" style="margin:8px 0 12px">Tocá las que quieras sumar. La lista se edita en <a style="cursor:pointer" onclick="go('config')">Configuración</a>.</p>
+      ${area("aclExtra","Otras aclaraciones para este mensaje (una por línea)",2)}</div>
+  </div>
+  <div class="sticky"><div class="box"><div class="row" style="margin-bottom:12px"><h2 style="margin:0">Vista previa</h2>
+      <span style="margin-left:auto" class="row"><button class="btn sec" onclick="msjAbrir()">Abrir WhatsApp</button><button class="btn" onclick="msjCopiar()">Copiar</button></span></div>
+    <div class="msj-prev" id="msjPrev"></div>
+    <p class="hint" style="margin:8px 0 0">Se actualiza mientras escribís. Los bloques vacíos no aparecen.</p></div></div>
+  </div>`;
+};
+
 /* ═════════════ CONFIGURACIÓN ═════════════ */
 VIEWS.config = function(){
   const g = DB.cfg;
@@ -3342,7 +3511,7 @@ VIEWS.config = function(){
     <label class="f"><span>1 R$ en pesos</span><input type="number" value="${g.tc.BRL}" oninput="DB.cfg.tc.BRL=Number(this.value)||0;save()"></label></div></div>
   <div class="box"><h2>Plata inicial de la caja</h2><p class="small muted" style="margin-top:-6px">La plata que ya había antes de cargar movimientos en el CRM, más lo que pusieron los socios de su bolsillo. Sin esto la caja arranca en cero y puede dar negativa. Para mirar si coincide con lo que tenés en el banco y en efectivo, abrí el detalle de la caja en el panel.</p><div class="grid g4">
     ${MON_ORD.map(m=>`<label class="f"><span>En ${({ARS:"pesos",USD:"dólares",BRL:"reales"})[m]}</span><input type="number" step="any" value="${n0(g.cajaInicial[m])||""}" placeholder="0" oninput="DB.cfg.cajaInicial['${m}']=Number(this.value)||0;save()"></label>`).join("")}</div></div>
-  <div class="dgrid" style="margin-top:16px">${lista("medios","Medios de pago")}${lista("canales","Canales de ingreso")}${lista("localidades","Localidades")}${lista("tiposProv","Tipos de proveedor")}${lista("catEgresos","Categorías de egresos")}${lista("segmentos","Perfiles de cliente")}${lista("intereses","Intereses")}${lista("viajaCon","Con quién viaja")}${lista("temporadas","Cuándo prefiere viajar")}${lista("presupuestos","Presupuestos")}${lista("feriados","Feriados y días no laborables (AAAA-MM-DD Nombre)")}</div>
+  <div class="dgrid" style="margin-top:16px">${lista("medios","Medios de pago")}${lista("canales","Canales de ingreso")}${lista("localidades","Localidades")}${lista("tiposProv","Tipos de proveedor")}${lista("catEgresos","Categorías de egresos")}${lista("segmentos","Perfiles de cliente")}${lista("intereses","Intereses")}${lista("viajaCon","Con quién viaja")}${lista("temporadas","Cuándo prefiere viajar")}${lista("presupuestos","Presupuestos")}${lista("feriados","Feriados y días no laborables (AAAA-MM-DD Nombre)")}${lista("aclaraciones","Aclaraciones para los mensajes de cotización")}</div>
   <div class="box" style="margin-top:16px"><h2>Avisos de vencimientos</h2>
     <div class="grid g4"><label class="f"><span>Avisar con anticipación (días)</span><input type="number" min="1" max="60" value="${g.avisoDias}" oninput="DB.cfg.avisoDias=Math.max(1,Number(this.value)||7);save()" onchange="renderSide()"></label>
       <label class="f"><span>Pagar al proveedor (hábiles antes)</span><input type="number" min="0" max="20" value="${g.diasPagoProv}" oninput="DB.cfg.diasPagoProv=Math.max(0,Number(this.value)||0);save()"></label>
