@@ -60,6 +60,11 @@ div.iso-h span.t2{display:block;font-size:9.5px;letter-spacing:.05em;color:var(-
 .nav a:hover{background:var(--paper)}
 .nav a.on{background:var(--side3);border-left-color:#D08A3C;font-weight:600;color:#fff}
 .nav-sec{text-transform:uppercase;letter-spacing:.08em;font-size:10.5px!important;color:#8E846F!important}
+button.nav-sec{display:flex;align-items:center;gap:6px;width:100%;background:none;border:0;cursor:pointer;text-align:left;font-family:inherit}
+button.nav-sec:hover{color:#EFE8D9!important}
+.nav-sec .fl{display:inline-block;width:10px;font-size:9px;transition:transform .15s}
+.nav-sec.open .fl{transform:rotate(90deg)}
+.nav-sec .pt{margin-left:auto;width:8px;height:8px;border-radius:50%;background:var(--terra)}
 .side-foot a{color:#E0B276}
 .side .brand{border-bottom:1px solid var(--side3);margin-bottom:6px}
 .nav a .ni{flex:none;width:22px;text-align:center;font-size:16px;line-height:1;font-family:"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif}
@@ -967,23 +972,27 @@ function proximoSeguimiento(l){ return l.proxSeg || ""; }
 const leadAbierto = l => !["Reservado","Perdido"].includes(l.etapa);
 
 /* ═════════════ NAVEGACIÓN ═════════════ */
+/* El menú va en grupos que se pliegan. `cerrado` = arranca plegado; si adentro hay algo urgente, el título muestra un punto. */
 const NAV = [
-  {k:"panel", t:"Panel de control", i:"📊"},
+  {sec:"Ventas", g:"ventas"},
   {k:"leads", t:"Leads", i:"🎯", c:()=>DB.leads.filter(leadAbierto).length,
     hot:()=>DB.leads.some(l=>leadAbierto(l) && l.proxSeg && l.proxSeg<=today())},
   {k:"mensajes", t:"Mensajes de cotización", i:"💬"},
   {k:"reservas", t:"Reservas", i:"🧳", c:()=>DB.reservas.filter(esActiva).length},
   {k:"paquetes", t:"Paquetes", i:"🗺️", c:()=>DB.paquetes.filter(p=>p.activo!=="No").length},
-  {k:"avisos", t:"Avisos", i:"🔔", c:()=>avisos().filter(a=>["vencido","hoy","pronto"].includes(tramo(a))).length, hot:()=>urgentes().length>0},
   {k:"cobros", t:"Cobros y recibos", i:"💵"},
+  {sec:"Administración", g:"admin", cerrado:true},
   {k:"pagos", t:"Pagos a operadores", i:"🧾", c:()=>avisos().filter(a=>a.k==="pago").length, hot:()=>avisos().some(a=>a.k==="pago" && ["vencido","hoy"].includes(tramo(a)))},
   {k:"egresos", t:"Egresos", i:"💸"},
   {k:"cuadrar", t:"Cuadrar caja", i:"⚖️", c:()=>cuadreAtrasado()?"!":"", hot:()=>cuadreAtrasado()},
-  {sec:"Bases"},
+  {sec:"Control", g:"control"},
+  {k:"panel", t:"Panel de control", i:"📊"},
+  {k:"avisos", t:"Avisos", i:"🔔", c:()=>avisos().filter(a=>["vencido","hoy","pronto"].includes(tramo(a))).length, hot:()=>urgentes().length>0},
+  {sec:"Bases", g:"bases"},
   {k:"clientes", t:"Clientes", i:"👥", c:()=>DB.clientes.length},
   {k:"proveedores", t:"Proveedores y operadores", i:"🤝", c:()=>DB.proveedores.length},
   {k:"destinos", t:"Destinos", i:"📍", c:()=>DB.destinos.length},
-  {sec:"Sistema"},
+  {sec:"Sistema", g:"sistema"},
   {k:"config", t:"Configuración", i:"⚙️"},
 ];
 let vista = "panel", param = null;
@@ -998,15 +1007,32 @@ const ISO_L1 = "Turismo", ISO_L2 = "San Juan, Argentina";
 const isoV = (w=58) => `<div class="iso">${ICONO(w)}<b>${esc((DB.cfg.agencia||"Ocre").toUpperCase())}</b><span class="t1">${ISO_L1.toUpperCase()}</span><span class="t2">${ISO_L2.toUpperCase()}</span></div>`;
 const isoH = (w=46) => `<div class="iso-h">${ICONO(w)}<div><b>${esc((DB.cfg.agencia||"Ocre").toUpperCase())}</b><span class="t1">${ISO_L1.toUpperCase()}</span><span class="t2">${ISO_L2.toUpperCase()}</span></div></div>`;
 
+/* Qué grupos del menú están plegados: se recuerda en este navegador (no va a la base). */
+let navPlegado = (()=>{ try{ return JSON.parse(localStorage.getItem("ocre_nav")||"null"); }catch(e){ return null; } })()
+  || Object.fromEntries(NAV.filter(n=>n.sec && n.cerrado).map(n=>[n.g,true]));
+function navGrupo(g){
+  navPlegado[g] = !navPlegado[g];
+  try{ localStorage.setItem("ocre_nav", JSON.stringify(navPlegado)); }catch(e){}
+  renderSide();
+}
+const navActivo = k => vista===k || (["reserva","resEdit"].includes(vista) && k==="reservas") || (vista==="paqEdit" && k==="paquetes");
+function navHtml(){
+  const grupos = []; NAV.forEach(n=> n.sec ? grupos.push({...n, items:[]}) : grupos.at(-1).items.push(n));
+  return grupos.map(G=>{
+    const abierto = !navPlegado[G.g] || G.items.some(n=>navActivo(n.k));   /* el grupo de la pantalla actual siempre se ve */
+    const urgente = G.items.some(n=>n.hot && n.hot());
+    return `<button type="button" class="nav-sec ${abierto?"open":""}" onclick="navGrupo('${G.g}')" aria-expanded="${abierto}"><span class="fl" aria-hidden="true">▶</span>${G.sec}${!abierto && urgente ? `<span class="pt" title="Hay algo urgente acá adentro"></span>` : ""}</button>` +
+      (abierto ? G.items.map(n=>`<a class="${navActivo(n.k)?"on":""}" onclick="go('${n.k}')"><span class="ni" aria-hidden="true">${n.i}</span>${n.t}
+        ${(()=>{ const k = n.c ? n.c() : ""; return k!=="" ? `<span class="cnt ${n.hot&&n.hot()?"hot":""}">${k}</span>` : ""; })()}</a>`).join("") : "");
+  }).join("");
+}
 function renderSide(){
   const nombre = (DB.cfg.agencia||"Ocre").trim() || "Ocre";
   document.title = nombre + " · Gestión";
   const tn = $("topNombre"); if(tn) tn.textContent = nombre.toUpperCase();
   $("side").innerHTML = `
     <div class="iso-card">${isoV(60)}</div>
-    <nav class="nav">${NAV.map(n=> n.sec ? `<div class="nav-sec">${n.sec}</div>` :
-      `<a class="${vista===n.k||(vista==="reserva"&&n.k==="reservas")||(vista==="resEdit"&&n.k==="reservas")||(vista==="paqEdit"&&n.k==="paquetes")?"on":""}" onclick="go('${n.k}')"><span class="ni" aria-hidden="true">${n.i}</span>${n.t}
-        ${(()=>{ const k = n.c ? n.c() : ""; return k!=="" ? `<span class="cnt ${n.hot&&n.hot()?"hot":""}">${k}</span>` : ""; })()}</a>`).join("")}</nav>
+    <nav class="nav">${navHtml()}</nav>
     <div class="side-foot"><span id="syncPill">${pillSync()}</span><br>
       <a onclick="go('config')" style="cursor:pointer">Respaldo y restauración</a>
       ${YO?`<div class="yo">${esc(YO.nombre||YO.email)} · <a onclick="salir()" style="cursor:pointer">Cerrar sesión</a></div>`:""}</div>`;
