@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════
--- AL OESTE · CRM — esquema de Supabase
+-- OCRE · CRM — esquema de Supabase
 -- Cada registro del CRM se guarda entero en `data` (jsonb), con su ID
 -- legible (CLI-0001, RES-0003…) como clave. Algunas columnas se derivan
 -- solas de `data` para poder leer y filtrar las tablas desde el panel

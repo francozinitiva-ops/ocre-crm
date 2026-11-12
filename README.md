@@ -1,9 +1,11 @@
 # Ocre · CRM
 
-Sistema de gestión de Ocre (reservas, clientes, proveedores, cobros, leads y egresos).
+Sistema de gestión de Ocre (reservas, clientes, proveedores, cobros, leads, egresos y mensajes de cotización para WhatsApp).
+
+- **Respaldo:** automático, los lunes a las 22 h, en el repositorio privado `ocre-respaldos`.
 
 - **App:** `index.html`. Es un solo archivo, publicado con GitHub Pages.
-- **Datos:** Supabase, proyecto «AL OESTE» (el nombre del proyecto en Supabase). Cada sección del CRM es una tabla `crm_*` con `id` y `data` (jsonb).
+- **Datos:** Supabase, proyecto «OCRE TURISMO» (antes «AL OESTE»). Cada sección del CRM es una tabla `crm_*` con `id` y `data` (jsonb).
 - **Acceso:** usuarios de Supabase Auth que estén cargados en `crm_usuarios`. Las políticas de seguridad (RLS) bloquean todo lo demás.
 - **Esquema:** `supabase_schema.sql`. Se puede volver a correr sin romper nada.
 
