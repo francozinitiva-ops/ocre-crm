@@ -1031,7 +1031,13 @@ const NAV = [
   {k:"config", t:"Configuración", i:"⚙️"},
 ];
 let vista = "panel", param = null;
-function go(k, p){ vista = k; param = p ?? null; $("side").classList.remove("open"); window.scrollTo(0,0); render(); }
+function go(k, p){ vista = k; param = p ?? null; navDesplegarActivo(); $("side").classList.remove("open"); window.scrollTo(0,0); render(); }
+/* Al entrar a una pantalla, su grupo del menú se despliega (si estaba plegado). Después se puede volver a plegar a mano. */
+function navDesplegarActivo(){
+  let g = null, cambio = false;
+  NAV.forEach(n=>{ if(n.sec) g = n.g; else if(g && navPlegado[g] && navActivo(n.k)){ navPlegado[g] = false; cambio = true; } });
+  if(cambio) try{ localStorage.setItem("ocre_nav", JSON.stringify(navPlegado)); }catch(e){}
+}
 function toggleSide(){ $("side").classList.toggle("open"); }
 
 /* Isotipo Ocre: sol + dos cerros. */
@@ -1054,7 +1060,7 @@ const navActivo = k => vista===k || (["reserva","resEdit"].includes(vista) && k=
 function navHtml(){
   const grupos = []; NAV.forEach(n=> n.sec ? grupos.push({...n, items:[]}) : grupos.at(-1).items.push(n));
   return grupos.map(G=>{
-    const abierto = !navPlegado[G.g] || G.items.some(n=>navActivo(n.k));   /* el grupo de la pantalla actual siempre se ve */
+    const abierto = !navPlegado[G.g];
     const urgente = G.items.some(n=>n.hot && n.hot());
     return `<button type="button" class="nav-sec ${abierto?"open":""}" onclick="navGrupo('${G.g}')" aria-expanded="${abierto}"><span class="fl" aria-hidden="true">▶</span>${G.sec}${!abierto && urgente ? `<span class="pt" title="Hay algo urgente acá adentro"></span>` : ""}</button>` +
       (abierto ? G.items.map(n=>`<a class="${navActivo(n.k)?"on":""}" onclick="go('${n.k}')"><span class="ni" aria-hidden="true">${n.i}</span>${n.t}
